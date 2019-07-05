@@ -1,4 +1,5 @@
 """
+This code performs recurring functions necessary for NLS analysis.
 
 It has linear and nonlinear subroutines.
 It has 1st, 2nd, and 6th order operator splitting.
