@@ -122,10 +122,6 @@ def kvec(gridnum):
     k = np.zeros(gridnum)
     k[0:split+1] = np.arange(0,split+1,1)
     k[split+1:gridnum] = np.arange(-split+1,0,1)
-    #############
-    k=-k
-    #############
-    
     return k
 
 
@@ -214,3 +210,47 @@ def rim_plt(xspace,initialprofile,ufinal,showplot=1):
     
     if showplot == 1:
         plt.show()
+
+
+
+#_______________________RUN SIMULATIONS_________________________________
+def rundNLS(PARAMS,simtimes,u0,expconsts,Del,per):
+    # PARAMS = [whichset,num_o_times,starttime,endtime,rk4steps,gridnum]
+    # whichset is the directory to put into
+    # num_o_times is an integer telling how many data points will be produced
+    # starttime is ususally 0, the beginning of the simulation
+    # endtime is the last time to step out to
+    # rk4steps is an integer telling how many steps of rk4 to perform in the nonlinear part (usually 1)
+    # gridnum is the x spatial resolution
+    
+    whichset = PARAMS[0]
+    num_o_times = PARAMS[1]
+    starttime = PARAMS[2]
+    rk4steps = PARAMS[3]
+    gridnum = PARAMS[4]
+    
+    # Initialize the matrix
+    r_dNLS = np.zeros((num_o_times,gridnum),dtype=complex)
+    r_dNLS[0,:]=u0
+    
+    # During iteration, deltat (the size of the step remains the same)
+    # The initial profile u0 is always the input
+    # The final time to step out increases in each loop, thus the number of steps increases in each iteration
+    for t in range(1,num_o_times):
+        steps = t*1
+        endtime = simtimes[t]
+        deltat = (endtime-starttime)/steps
+        #print(steps, endtime, deltat)
+        
+        sim_dNLS = sixth(u0,deltat,steps,expconsts,Del,per)
+        r_dNLS[t,:]=sim_dNLS
+    
+    # Save data
+    for s in range(num_o_times):
+        if s < 10:
+            ss = '00'+str(s)
+        elif 9<s<100:
+            ss='0'+str(s)
+        else:
+            ss = str(s)
+        np.savetxt(whichset+'Simulations/dNLS Sim/simdNLS'+ss+'.txt',r_dNLS[s].view(float))

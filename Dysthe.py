@@ -216,3 +216,48 @@ def ri_er(an_ufinal,ufinal): #At any given time t
     realerror = np.sum(np.abs(ranuf-ruf)**2)/N
     imagerror = np.sum(np.abs(ianuf-iuf)**2)/N
     return (realerror,imagerror)
+
+
+
+#_______________________RUN SIMULATIONS_________________________________
+
+def runDysthe(PARAMS,simtimes,u0,k,expconsts,epsilon,per):
+    # PARAMS = [whichset,num_o_times,starttime,endtime,rk4steps,gridnum]
+    # whichset is the directory to put into
+    # num_o_times is an integer telling how many data points will be produced
+    # starttime is ususally 0, the beginning of the simulation
+    # endtime is the last time to step out to
+    # rk4steps is an integer telling how many steps of rk4 to perform in the nonlinear part (usually 1)
+    # gridnum is the x spatial resolution
+    
+    whichset = PARAMS[0]
+    num_o_times = PARAMS[1]
+    starttime = PARAMS[2]
+    rk4steps = PARAMS[3]
+    gridnum = PARAMS[4]
+    
+    # Initialize matrix
+    r_Dysthe = np.zeros((num_o_times,gridnum),dtype=complex)
+    r_Dysthe[0,:]=u0
+
+    # During iteration, deltat (the size of the step remains the same)
+    # The initial profile u0 is always the input
+    # The final time to step out increases in each loop, thus the number of steps increases in each iteration
+    for t in range(1,num_o_times):
+        steps = t*1
+        endtime = simtimes[t]
+        deltat = (endtime-starttime)/steps
+        #print(steps, endtime, deltat)
+       
+        sim_Dysthe = sixth(u0,deltat,steps,rk4steps,k,expconsts,epsilon,per)
+        r_Dysthe[t,:]=sim_Dysthe
+    
+    # Save data
+    for s in range(num_o_times):
+        if s < 10:
+            ss = '00'+str(s)
+        elif 9<s<100:
+            ss='0'+str(s)
+        else:
+            ss = str(s)
+        np.savetxt(whichset+'Simulations/Dysthe Sim/simDysthe'+ss+'.txt',r_Dysthe[s].view(float))

@@ -15,10 +15,15 @@ import csv
 from sys import exit
 
 
-def createstruct(refdir,masterdir):
+def createstruct(refdir,masterdir, subdirs):
+    # Refdir is the reference directory structure, stored on my computer for EACH data set
+    # Masterdir is the directory under which all the other work will be stored.
+    # Data_sets currently include Aug1Data, Aug2Data, and JulyData. Will be
+    # given by a list of indices (I think)
+    
+    
     ### Creates the system of directories necessary for the code to work and store the results
     
-    subdirs = ['Aug1Data/','Aug2Data/','JulyData/']
     
     for sd in subdirs:
                     
@@ -32,35 +37,33 @@ def createstruct(refdir,masterdir):
         for dirpath, dirnames, filenames in os.walk(inputpath):
             structure = os.path.join(outputpath, dirpath[len(inputpath):])
             if not os.path.isdir(structure):
-                os.mkdir(structure)
+                os.mkdir(structure) 
             else:
                 print("Folder already exits!")
 
 
 def readsvals(whichset):
+    # This function reads values from the Special Values text file associated with each sim
     with open(whichset+'SpecialVals.txt') as csv_file:
         csv_reader = csv.reader(csv_file, delimiter=',')
     
         vals=[row for idx, row in enumerate(csv_reader) if idx in (4,5,6)]
     
+        # Find omega_0, epsilon, and delta. 
         w0 = vals[0][1]
         epsilon = vals[1][1]
         Del = vals[2][1]
     
+        # Convert the results to floats so that they are actually intrepreted as numbers
     return (float(w0),float(epsilon),float(Del))
 
 
 
-def processnondim(masterdir,newn, L, doIplot = 'no',doIplot_chi = 'go'):
+def processnondim(masterdir, deltaf, L, subdirs, doIplot = 'no',doIplot_chi = 'go'):
     
     ### STEP 1: Get distance information
     distv = np.array([0.0,2400000.0,4200000.0,8700000.0]) # Distances between gauges in METERS
-    
-    
-    
-    ### STEP 2: Read in information at each gauge for each event
-    subdirs = ['Aug1Data/','Aug2Data/','JulyData/']
-    
+
     
     # Define something that will list directories that are not hidden
     def listdirNH(path):
@@ -105,7 +108,8 @@ def processnondim(masterdir,newn, L, doIplot = 'no',doIplot_chi = 'go'):
             # Choose the spacing of the grid based on the first maximum value
             if gaugenumber == 0:
             
-                deltaf=x[xmaxloc]*2/(newn+1) # The new spacing between points
+                newn = x[xmaxloc]*2/deltaf-1
+                newn = int(round(newn,0)) # The new spacing between points
                 
                 # Create the new grid of x points based on the spacing deltaf and the location of the max
                 xn = np.zeros(newn)
@@ -138,8 +142,13 @@ def processnondim(masterdir,newn, L, doIplot = 'no',doIplot_chi = 'go'):
             
     ### STEP 4: Get the k vector using integer division and clean up
             lenly = len(ly)
-            k = (xfinal)//(2*np.pi/L) # Then divide by 2pi/L (using integer division) to get the k vector
+            k = np.round((xfinal)/(2*np.pi/L),0)  # Then divide by 2pi/L (rounding to integers) to get the k vector
             
+            if doIplot == 'go':
+                plt.title('Comparing the values when forced into kvector slots')
+                plt.plot((xfinal)/(2*np.pi/L),ly,'.')
+                plt.plot(k,ly,'.')
+                plt.show()
             
             
     ### STEP 5: Generate random phase and real and imaginary parts
@@ -340,7 +349,7 @@ def processnondim(masterdir,newn, L, doIplot = 'no',doIplot_chi = 'go'):
 
 
 
-def dataspecialvals(masterdir,showplots='no'):
+def dataspecialvals(masterdir, subdirs, showplots='no'):
     
     # Define something that will list directories that are not hidden
     def listdirNH(path):
@@ -348,8 +357,11 @@ def dataspecialvals(masterdir,showplots='no'):
     
     
     ### STEP 1: Read in the xi, B, and chi data
-    for whichset in ['Aug1Data/'+masterdir,'Aug2Data/'+masterdir,'JulyData/'+masterdir]:
-            
+
+    
+    for set in subdirs:
+        
+        whichset = set + masterdir
         
         
         # Choose the name of the file the data will be pulled from
@@ -609,13 +621,22 @@ def dataspecialvals(masterdir,showplots='no'):
 
 
 
-def runsims(masterdir,num_o_times, bet, per):
+def runsims(SIMULATIONS, masterdir,subdirs, num_o_times, bet, per):
+    
+    y_NLS = SIMULATIONS[0]
+    y_dNLS = SIMULATIONS[1]
+    y_Dysthe = SIMULATIONS[2]
+    y_vDysthe = SIMULATIONS[3]
+    y_dGT = SIMULATIONS[4]
+    y_IS = SIMULATIONS[5]
     # bet is the parameter for the Islas Schober Eqn
     # per controls the 3/16ths rule
     
     
     # Define master directory
-    for whichset in ['Aug1Data/'+masterdir,'Aug2Data/'+masterdir,'JulyData/'+masterdir]:
+    for set in subdirs:
+        
+        whichset = set+masterdir
         
         w0,epsilon,Del = readsvals(whichset)
         
@@ -639,73 +660,39 @@ def runsims(masterdir,num_o_times, bet, per):
         L = xspace[-1]-xspace[0]+(xspace[1]-xspace[0])
         gridnum = len(xspace)
         k, expconsts = vdy.kvec(gridnum,L)
+        endtime = simtimes[-1]
         rk4steps = 1
         
-        # Perform operator splitting
-        r_NLS = np.zeros((num_o_times,gridnum),dtype=complex)
-        r_dNLS = np.zeros((num_o_times,gridnum),dtype=complex)
-        r_Dysthe = np.zeros((num_o_times,gridnum),dtype=complex)
-        r_vDysthe = np.zeros((num_o_times,gridnum),dtype=complex)
-        r_dGT = np.zeros((num_o_times,gridnum),dtype=complex)
-        r_IS = np.zeros((num_o_times,gridnum),dtype=complex)
+        PARAMS = [whichset,num_o_times,starttime,rk4steps,gridnum]
         
-        r_NLS[0,:]=u0
-        r_dNLS[0,:]=u0
-        r_Dysthe[0,:]=u0
-        r_vDysthe[0,:]=u0
-        r_dGT[0,:]=u0
-        r_IS[0:]=u0
-        
-        
-        xyz = 0
-        for t in range(1,num_o_times):
-            steps = t*1
-            endtime = simtimes[t]
-            deltat = (endtime-starttime)/steps
-            #print(steps, endtime, deltat)
+        if y_NLS =='y':
+            print('ran NLS')
+            NLS.runNLS(PARAMS,simtimes,u0,expconsts,per)
             
-            sim_NLS = NLS.sixth(u0,deltat,steps,expconsts,per)
-            sim_dNLS = dNLS.sixth(u0,deltat,steps,expconsts,Del,per)
-            sim_Dysthe = dy.sixth(u0,deltat,steps,rk4steps,k,expconsts,epsilon,per)
-            sim_vDysthe = vdy.sixth(u0,deltat,steps,rk4steps,k,expconsts,epsilon,Del,3/4)
-            sim_dGT = dGT.sixth(u0,deltat,steps,rk4steps,k,expconsts,epsilon,Del,per)
-            sim_IS = IS.sixth(u0,deltat,steps,rk4steps,k,expconsts,bet,epsilon,Del,per)
+        if y_dNLS =='y':
+            print('ran dNLS')
+            dNLS.rundNLS(PARAMS,simtimes,u0,expconsts,Del,per)
             
-            if np.isnan(sim_vDysthe[0]):
-                if xyz == 0:
-                    os.system('say "Simulation Overflow Error"')
-                    xyz=+1
-                    input('Continue? Press enter.')
+        if y_Dysthe =='y':
+            dy.runDysthe(PARAMS,simtimes,u0,k,expconsts,epsilon,per)
             
-            r_NLS[t,:]=sim_NLS
-            r_dNLS[t,:]=sim_dNLS
-            r_Dysthe[t,:]=sim_Dysthe
-            r_vDysthe[t,:]=sim_vDysthe
-            r_dGT[t,:]=sim_dGT
-            r_IS[t,:] = sim_IS
-            
-            #print('vdysthe',np.sum(abs(sim_dGT-sim_vDysthe)**2))
-            #print('dnls',np.sum(abs(sim_dGT-sim_dNLS)**2))
+        if y_vDysthe == 'y':
+            print('ran vDysthe')
+            vdy.runvDysthe(PARAMS,simtimes,u0,k,expconsts,epsilon,Del,per)
         
+        if y_dGT == 'y':
+            print('ran dGT')
+            dGT.rundGT(PARAMS,simtimes,u0,k,expconsts,epsilon,Del,per)
+            
+        if y_IS == 'y':
+            print('ran IS')
+            IS.runIS(PARAMS,simtimes,u0,k,expconsts,bet,epsilon,Del,per)
+            
         
-        # Save data
-        for s in range(num_o_times):
-            if s < 10:
-                ss = '00'+str(s)
-            elif 9<s<100:
-                ss='0'+str(s)
-            else:
-                ss = str(s)
-            np.savetxt(whichset+'Simulations/NLS Sim/simNLS'+ss+'.txt',r_NLS[s].view(float))
-            np.savetxt(whichset+'Simulations/dNLS Sim/simdNLS'+ss+'.txt',r_dNLS[s].view(float))
-            np.savetxt(whichset+'Simulations/Dysthe Sim/simDysthe'+ss+'.txt',r_Dysthe[s].view(float))
-            np.savetxt(whichset+'Simulations/vDysthe Sim/simvDysthe'+ss+'.txt',r_vDysthe[s].view(float))
-            np.savetxt(whichset+'Simulations/dGT Sim/simdGT'+ss+'.txt',r_dGT[s].view(float))
-            np.savetxt(whichset+'Simulations/IS Sim/simIS'+ss+'.txt',r_IS[s].view(float))
 
 
 
-def simspecialvals(masterdir):
+def simspecialvals(masterdir, subdirs):
     
     # Define something that will list directories that are not hidden
     def listdirNH(path):
@@ -715,205 +702,209 @@ def simspecialvals(masterdir):
     ### STEP 1: Load in simulation data
     
     # Load time values
-    for whichset in ['Aug1Data/'+masterdir,'Aug2Data/'+masterdir,'JulyData/'+masterdir]:
-            tvector = np.loadtxt(whichset+'Simulations/SimTime.txt').view(float)
+ 
+    for set in subdirs:
+        whichset = set + masterdir
+        tvector = np.loadtxt(whichset+'Simulations/SimTime.txt').view(float)
+    
+        # Choose the name of the file the data will be pulled from
+        masterdir1 = whichset+'Simulations/'
+        dir = ['dGT Sim','dNLS Sim', 'Dysthe Sim','IS Sim', 'NLS Sim','vDysthe Sim']
         
-            # Choose the name of the file the data will be pulled from
-            masterdir1 = whichset+'Simulations/'
-            dir = ['dGT Sim','dNLS Sim', 'Dysthe Sim','IS Sim', 'NLS Sim','vDysthe Sim']
-            
-            NLSd = {} 
-            dNLSd = {}
-            Dysthed = {}
-            ISd = {}
-            vDysthed = {}
-            dGTd = {}
-            Dictionaries = [dGTd,dNLSd,Dysthed,ISd, NLSd,vDysthed] # Alphabetized
-            
-            # Read in the intital data
-            IC = np.loadtxt(whichset+'NonDim Data/NDgauge2.out').view(complex)
-            x = IC[0]
-            y = IC[1]
-            
-            h = 0
-            for m in dir:
-                dict = Dictionaries[h]
-                dirnames = listdirNH(masterdir1+m)
-                dirlength = len(dirnames)
-                kk = 0
-                for name in dirnames:
-                    if os.path.isfile(name) == True:
-                        title = tvector[kk]
-                        vdatavals = np.loadtxt(name).view(complex)
-                        N = len(vdatavals)
-                        dict[title]=np.append([x],[vdatavals],axis=0)
-                        kk=kk+1
-                h=h+1
-            
-            
-            
-            ### STEP 2: Find the sideband values and the carrier wave location
-            
-            # Perform an FFT of the y values
-            yhat =fft(y) # Fourier amplitudes
-            yhat1 = 1/N*np.abs(yhat) # Normalized fourier amplitudes
-            
-            # Define some constants/constant vectors
-            L = x[-1]-x[0]+(x[1]-x[0])
-            k=NLS.kvec(N)
-            #sv = np.array([-3,-2,-1,0,1,2,3]) # The sideband vector
-            sv = [] # the sideband vector
-            for j in range(len(yhat1)):
-                if yhat1[j]>0.00000000001:
-                    sv.append(j)
-            
-            lll = len(sv)
-            
-            # Find max Fourier amplitude and location
-            mt = max(yhat1) # The max amplitude (m)
-            i = np.where(yhat1 == mt)[0][0] ################################
-            carrier = 1/L*k[i]
-            
-            ### STEP 3: Find P, M, omega_m, omega_p, and the sidebands at each gauge location (each xi)
-            
-            NLSCQ = {}
-            dNLSCQ = {}
-            DystheCQ = {}
-            ISCQ  = {}
-            vDystheCQ = {}
-            dGTCQ = {}
-            
-            CQDict = [dGTCQ,dNLSCQ, DystheCQ, ISCQ, NLSCQ, vDystheCQ]
-            keys = ['P', 'M', 'PM', 'wp', 'sb']
-            dname = ['dGT CQ','dNLS CQ','Dysthe CQ', 'IS CQ','NLS CQ','vDysthe CQ']
-            
-            cid = 0
-            for dict in Dictionaries:
-                Pvals = np.zeros(len(tvector))
-                Mvals = np.zeros(len(tvector))
-                PMvals = np.zeros(len(tvector))
-                wpeak = np.zeros(len(tvector))
-                sideband7 = np.zeros((len(tvector),lll))
-                j=0
-                CQs = CQDict[cid]
-                for n in dict:
-                    
-                    x=dict[n][0]
-                    y=dict[n][1]
-                    # Perform an FFT of the y values
-                    yhat =fft(y) # Fourier amplitudes
-                    yhat1 = 1/N*np.abs(yhat) # Normalized fourier amplitudes
-                    
-                    # Find max Fourier amplitude and location
-                    m = max(yhat1) # The max amplitude (m)
-                    i = np.where(yhat1 == m)
-                    
-                    carrier = 1/L*k[i] # omega_p
-                    P = NLS.CQ_P1(y,L,k) #P
-                    M = NLS.CQ_M(y,L) # M 
-                    PM = P/M # omega_m
-                    sidebands = yhat1[sv] # sidebands 
-                    
-                    Pvals[j] = np.real(P)
-                    Mvals[j] = np.real(M)
-                    PMvals[j] = np.real(PM)
-                    wpeak[j] = np.real(carrier[0])
-                    sideband7[j]=sidebands
-                    j=j+1
+        NLSd = {} 
+        dNLSd = {}
+        Dysthed = {}
+        ISd = {}
+        vDysthed = {}
+        dGTd = {}
+        Dictionaries = [dGTd,dNLSd,Dysthed,ISd, NLSd,vDysthed] # Alphabetized
+        
+        # Read in the intital data
+        IC = np.loadtxt(whichset+'NonDim Data/NDgauge2.out').view(complex)
+        x = IC[0]
+        y = IC[1]
+        
+        h = 0
+        for m in dir:
+            dict = Dictionaries[h]
+            dirnames = listdirNH(masterdir1+m)
+            dirlength = len(dirnames)
+            kk = 0
+            for name in dirnames:
+                if os.path.isfile(name) == True:
+                    title = tvector[kk]
+                    vdatavals = np.loadtxt(name).view(complex)
+                    N = len(vdatavals)
+                    dict[title]=np.append([x],[vdatavals],axis=0)
+                    kk=kk+1
+            h=h+1
+        
+        
+        
+        ### STEP 2: Find the sideband values and the carrier wave location
+        
+        # Perform an FFT of the y values
+        yhat =fft(y) # Fourier amplitudes
+        yhat1 = 1/N*np.abs(yhat) # Normalized fourier amplitudes
+        
+        # Define some constants/constant vectors
+        L = x[-1]-x[0]+(x[1]-x[0])
+        k=NLS.kvec(N)
+        #sv = np.array([-3,-2,-1,0,1,2,3]) # The sideband vector
+        sv = [] # the sideband vector
+        for j in range(len(yhat1)):
+            if yhat1[j]>0.00000000001:
+                sv.append(j)
+        
+        lll = len(sv)
+        
+        # Find max Fourier amplitude and location
+        mt = max(yhat1) # The max amplitude (m)
+        i = np.where(yhat1 == mt)[0][0] ################################
+        carrier = 1/L*k[i]
+        
+        ### STEP 3: Find P, M, omega_m, omega_p, and the sidebands at each gauge location (each xi)
+        
+        NLSCQ = {}
+        dNLSCQ = {}
+        DystheCQ = {}
+        ISCQ  = {}
+        vDystheCQ = {}
+        dGTCQ = {}
+        
+        CQDict = [dGTCQ, dNLSCQ, DystheCQ, ISCQ, NLSCQ, vDystheCQ]
+        keys = ['P', 'M', 'PM', 'wp', 'sb']
+        dname = ['dGT CQ','dNLS CQ','Dysthe CQ', 'IS CQ','NLS CQ','vDysthe CQ']
+        
+        cid = 0
+        for dict in Dictionaries:
+            Pvals = np.zeros(len(tvector))
+            Mvals = np.zeros(len(tvector))
+            PMvals = np.zeros(len(tvector))
+            wpeak = np.zeros(len(tvector))
+            sideband7 = np.zeros((len(tvector),lll))
+            j=0
+            CQs = CQDict[cid]
+            for n in dict:
                 
-                    valuevect = [Pvals,Mvals,PMvals,wpeak,sideband7]
+                x=dict[n][0]
+                y=dict[n][1]
+                # Perform an FFT of the y values
+                yhat =fft(y) # Fourier amplitudes
+                yhat1 = 1/N*np.abs(yhat) # Normalized fourier amplitudes
                 
-                for val in range(len(keys)):
-                    CQs[keys[val]] = valuevect[val]
-            
-                # Get the number on each sideband for later labeling purposes
-                svlabp = []
-                iop  = 0
-                for gg in range(len(sv)):
-                    if sv[gg] <N//2:
-                        svlabp.append(iop)
-                        iop +=1
+                # Find max Fourier amplitude and location
+                m = max(yhat1) # The max amplitude (m)
+                i = np.where(yhat1 == m)
                 
-                svlabn = []
-                iop  = 1
-                for gg in range(len(sv)):
-                    if np.flip(sv,axis =0)[gg] >N//2:
-                        svlabn.append(-iop)
-                        iop +=1
-                svlab = np.append(svlabp,np.flip(svlabn,axis=0),axis=0) 
+                carrier = 1/L*k[i] # omega_p
+                P = NLS.CQ_P1(y,L,k) #P
+                M = NLS.CQ_M(y,L) # M 
+                PM = P/M # omega_m
+                sidebands = yhat1[sv] # sidebands 
                 
-            ### STEP 4: Plot the results
+                Pvals[j] = np.real(P)
+                Mvals[j] = np.real(M)
+                PMvals[j] = np.real(PM)
+                wpeak[j] = np.real(carrier[0])
+                sideband7[j]=sidebands
+                j=j+1
             
-                plotem = 1
-                if plotem == 1:
-                    tn = dname[cid]
-                    
-                    # Plotting vectors
-                    fig1, ax1 = plt.subplots(2,2,figsize = (10,6.5))
-                    fig1.suptitle(tn+' Quantities of Interest',fontsize=16)
+                valuevect = [Pvals,Mvals,PMvals,wpeak,sideband7]
             
-                    
-                    plotter1 = [Pvals,Mvals,PMvals,wpeak]
-                    titles1 = ['CQ P', 'CQ M', r'$\omega_m$', r'$\omega_p$']
-                            
-                    ax1 = ax1.flatten()
-                    for i in range(len(plotter1)):
-                        ax1[i].plot(tvector,plotter1[i])
-                        ax1[i].set_title(titles1[i])
-                        ax1[i].set_xlabel(r'$\chi$')
-                    fig1.tight_layout()
-                    fig1.subplots_adjust(top=0.88)
-                    plt.savefig(whichset+'Simulations/CQ Figs/CQ '+tn+'.png')
-                    
-                    fig2, ax2 = plt.subplots(lll,sharex=True,figsize = (7,1.625*lll))
-                    fig2.suptitle(tn+' Select Fourier Amplitudes',fontsize=16)
-                    for po in range(lll):
-                        vp = sideband7[:,po]
-                        ax2[po].plot(tvector,vp)
-                        ax2[po].set_ylabel('a'+ r'$_{'+str(svlab[po])+'}$')
-                    
-                    
-                    fig2.tight_layout()
-                    fig2.subplots_adjust(top=0.97)
-                    plt.savefig(whichset+'Simulations/CQ Figs/Sidebands '+tn+'.png')
+            for val in range(len(keys)):
+                CQs[keys[val]] = valuevect[val]
+        
+            # Get the number on each sideband for later labeling purposes
+            svlabp = []
+            iop  = 0
+            for gg in range(len(sv)):
+                if sv[gg] <N//2:
+                    svlabp.append(iop)
+                    iop +=1
             
+            svlabn = []
+            iop  = 1
+            for gg in range(len(sv)):
+                if np.flip(sv,axis =0)[gg] >N//2:
+                    svlabn.append(-iop)
+                    iop +=1
+            svlab = np.append(svlabp,np.flip(svlabn,axis=0),axis=0) 
             
-                cid = cid +1
-                plt.close('all')
-            
-            
-            ### STEP 5: Save the Data
-            
-            dval = 0
-            for dict in CQDict:
-                dctnm = dname[dval]
-                m=0
-                for cons in dict:
-                    filename = whichset+'Simulations/Conserved Quantities/'+dctnm+'/'+cons+'.txt'
-            
-                    consval =  dict[cons]
-            
-                    if consval.shape==tvector.shape:
-                        savedata = np.append([tvector],[consval],axis=0)
-                        np.savetxt(filename, np.transpose(savedata).view(float))
-                    else:
-                        savedata = np.insert(consval, 0, tvector, axis=1)
-                        np.savetxt(filename, savedata.view(float))
-                    m=m+1
-                    
-                dval = dval +1
+        ### STEP 4: Plot the results
+        
+            plotem = 1
+            if plotem == 1:
+                tn = dname[cid]
+                
+                # Plotting vectors
+                fig1, ax1 = plt.subplots(2,2,figsize = (10,6.5))
+                fig1.suptitle(tn+' Quantities of Interest',fontsize=16)
+        
+                
+                plotter1 = [Pvals,Mvals,PMvals,wpeak]
+                titles1 = ['CQ P', 'CQ M', r'$\omega_m$', r'$\omega_p$']
+                        
+                ax1 = ax1.flatten()
+                for i in range(len(plotter1)):
+                    ax1[i].plot(tvector,plotter1[i])
+                    ax1[i].set_title(titles1[i])
+                    ax1[i].set_xlabel(r'$\chi$')
+                fig1.tight_layout()
+                fig1.subplots_adjust(top=0.88)
+                plt.savefig(whichset+'Simulations/CQ Figs/CQ '+tn+'.png')
+                
+                fig2, ax2 = plt.subplots(lll,sharex=True,figsize = (7,1.625*lll))
+                fig2.suptitle(tn+' Select Fourier Amplitudes',fontsize=16)
+                for po in range(lll):
+                    vp = sideband7[:,po]
+                    ax2[po].plot(tvector,vp)
+                    ax2[po].set_ylabel('a'+ r'$_{'+str(svlab[po])+'}$')
+                
+                
+                fig2.tight_layout()
+                fig2.subplots_adjust(top=0.97)
+                plt.savefig(whichset+'Simulations/CQ Figs/Sidebands '+tn+'.png')
+        
+        
+            cid = cid +1
+            plt.close('all')
+        
+        
+        ### STEP 5: Save the Data
+        
+        dval = 0
+        for dict in CQDict:
+            dctnm = dname[dval]
+            m=0
+            for cons in dict:
+                filename = whichset+'Simulations/Conserved Quantities/'+dctnm+'/'+cons+'.txt'
+        
+                consval =  dict[cons]
+        
+                if consval.shape==tvector.shape:
+                    savedata = np.append([tvector],[consval],axis=0)
+                    np.savetxt(filename, np.transpose(savedata).view(float))
+                else:
+                    savedata = np.insert(consval, 0, tvector, axis=1)
+                    np.savetxt(filename, savedata.view(float))
+                m=m+1
+                
+            dval = dval +1
         
 
 
-def redim(masterdir):
+def redim(masterdir,subdirs):
     
     # Define something that will list directories that are not hidden
     def listdirNH(path):
         return glob.glob(os.path.join(path, '*'))
     
     ### STEP 1: READ IN THE EXPERIMENTAL DATA FILES
-    for whichset in ['Aug1Data/'+masterdir,'Aug2Data/'+masterdir,'JulyData/'+masterdir]:
-            
+    
+    for set in subdirs:
+        
+        whichset = set + masterdir    
         
         # Define the dictionaries
         P = {}
@@ -1032,7 +1023,7 @@ def redim(masterdir):
         y1 = ['M (m'+r'$^2$'+')','P (m'+r'$^2$'+'/s)',r'$\omega_m$'+' (mHz)',r'$\omega_p$'+' (mHz)']
         #y2 = [r'$|a_{-3}|$'+' (m)',r'$|a_{-2}|$'+' (m)',r'$|a_{-1}|$'+' (m)',r'$|a_0|$'+' (m)',r'$|a_1|$'+' (m)',r'$|a_2|$'+' (m)',r'$|a_3|$'+' (m)']
         # https://matplotlib.org/devdocs/gallery/lines_bars_and_markers/linestyles.html
-        disp = [0, (0, ()), (0, (5, 1)), (0, (3, 1, 1, 1, 1, 1)), (0, (1, 1)), (0, (3, 1, 1, 1)), (0, (1,5))]
+        disp = [0, (0, (1, 1)), (0, (5, 1)), (0, (3, 1, 1, 1, 1, 1)), (0, ()), (0, (3, 1, 1, 1)),(0, (1,5))]
         colors = ['k','#BF8EDE','#EfA0A0','#84E3BE','#EFD7B0','#443E9D','#D65050']
         sizes = [13,1.5,1.5,1.5,1.5,1.5,1.5]
         
@@ -1109,7 +1100,7 @@ def redim(masterdir):
                 np.savetxt(whichset+'Simulations/Dimensional Results/'+str(ky)[:-3]+' dimCQ/'+val[-1]+'.txt',np.transpose(dim_sb[ky]).view(float))
 
 
-def sberror(masterdir):
+def sberror(masterdir,subdirs):
     # Define something that will list directories that are not hidden
     def listdirNH(path):
         return glob.glob(os.path.join(path, '*'))
@@ -1121,75 +1112,77 @@ def sberror(masterdir):
         return array[idx]
 
     # Begin finding errors for each set of data
-    for whichset in ['Aug1Data/'+masterdir,'Aug2Data/'+masterdir,'JulyData/'+masterdir]:
-            # Load in the data sideband values
-            datacqvalues = np.loadtxt(whichset+'Data CQs/Dim CQ Values/dimsb.txt')
-            
-            # Load in the data and simulations time vectors
-            tvector = np.loadtxt(whichset+'Simulations/SimTime.txt').view(float)
-            chi = np.loadtxt(whichset+'chi.txt').view(float)
-            
-            # Choose the name of the file the data will be pulled from
-            masterdir1 = whichset+'Simulations/Dimensional Results/'
-            dir = ['dGT dimCQ/', 'dNLS dimCQ/', 'Dysthe dimCQ/','IS dimCQ/', 'NLS dimCQ/','vDysthe dimCQ/']
-            
-            # Set up some values for file writing
-            titles = ['dGT', 'dNLS', 'Dysthe', 'IS', 'NLS', 'vDysthe']
-            errorvect = np.array([])
-            
-            # Open a file to write the error in
-            file = open(whichset+'Simulations/Errors/SidebandError.txt','w+') 
-            k = 0
-            for d in dir:
-           
-                # Read in the intital data
-                sb = np.loadtxt(masterdir1+d+'dimsb.txt').view(float)
 
-                # Find the time values that won't exactly match
-                dif1 = chi[1]
-                dif2 = chi[2]
-                
-                # Find next closest time values
-                v1 = find_nearest(tvector,dif1)
-                i1 = np.where(tvector==v1)[0][0]
-                v2 = find_nearest(tvector,dif2)
-                i2 = np.where(tvector==v2)[0][0]
-                
-                # Now sum error over each of these times.
-                usable_times = [0,i1,i2,-1]
-                simulationtotalerror = 0
-                j=0
-                for t in usable_times:
-                    sim_val = sb[t][1:] # First entry is the distance in the ocean; don't want it
-                    data_val = datacqvalues[j][1:] # First entry is the distance in the ocean; don't want it
-                    error = 1/(len(data_val)-1)*np.sum(np.abs(sim_val-data_val)**2) # Error at each gauge
-                    simulationtotalerror += error
-                    j=j+1
-                    
-                # The final total error at all gauges, summed    
-                FinalError = np.sum(simulationtotalerror)
-                
-                # Add this value to a vector of all the errors
-                errorvect=np.append(errorvect,FinalError)
-                
-                # Write the error to a file
-                file.write(titles[k]+' Sideband Error, '+str(float(FinalError))+'\n')
-                k+=1
-             
-            file.close()
+    for set in subdirs:
+        whichset = set + masterdir
+        # Load in the data sideband values
+        datacqvalues = np.loadtxt(whichset+'Data CQs/Dim CQ Values/dimsb.txt')
+        
+        # Load in the data and simulations time vectors
+        tvector = np.loadtxt(whichset+'Simulations/SimTime.txt').view(float)
+        chi = np.loadtxt(whichset+'chi.txt').view(float)
+        
+        # Choose the name of the file the data will be pulled from
+        masterdir1 = whichset+'Simulations/Dimensional Results/'
+        dir = ['dGT dimCQ/', 'dNLS dimCQ/', 'Dysthe dimCQ/','IS dimCQ/', 'NLS dimCQ/','vDysthe dimCQ/']
+        
+        # Set up some values for file writing
+        titles = ['dGT', 'dNLS', 'Dysthe', 'IS', 'NLS', 'vDysthe']
+        errorvect = np.array([])
+        
+        # Open a file to write the error in
+        file = open(whichset+'Simulations/Errors/SidebandError.txt','w+') 
+        k = 0
+        for d in dir:
+       
+            # Read in the intital data
+            sb = np.loadtxt(masterdir1+d+'dimsb.txt').view(float)
+
+            # Find the time values that won't exactly match
+            dif1 = chi[1]
+            dif2 = chi[2]
             
-            # Find the minimum error and the simulation that accomplished that
-            m = min(errorvect)
-            h = np.where(errorvect==m)[0][0]
+            # Find next closest time values
+            v1 = find_nearest(tvector,dif1)
+            i1 = np.where(tvector==v1)[0][0]
+            v2 = find_nearest(tvector,dif2)
+            i2 = np.where(tvector==v2)[0][0]
             
-            # Write the minimum error to a file
-            file = open(whichset+'Simulations/Errors/MinErrors.txt','w+')
-            file.write('Sideband ' +', '+ titles[h]+', '+str(float(m))+'\n')
-            file.close()
+            # Now sum error over each of these times.
+            usable_times = [0,i1,i2,-1]
+            simulationtotalerror = 0
+            j=0
+            for t in usable_times:
+                sim_val = sb[t][1:] # First entry is the distance in the ocean; don't want it
+                data_val = datacqvalues[j][1:] # First entry is the distance in the ocean; don't want it
+                error = 1/(len(data_val)-1)*np.sum(np.abs(sim_val-data_val)**2) # Error at each gauge
+                simulationtotalerror += error
+                j=j+1
+                
+            # The final total error at all gauges, summed    
+            FinalError = np.sum(simulationtotalerror)
+            
+            # Add this value to a vector of all the errors
+            errorvect=np.append(errorvect,FinalError)
+            
+            # Write the error to a file
+            file.write(titles[k]+' Sideband Error, '+str(float(FinalError))+'\n')
+            k+=1
+         
+        file.close()
+        
+        # Find the minimum error and the simulation that accomplished that
+        m = min(errorvect)
+        h = np.where(errorvect==m)[0][0]
+        
+        # Write the minimum error to a file
+        file = open(whichset+'Simulations/Errors/MinErrors.txt','w+')
+        file.write('Sideband ' +', '+ titles[h]+', '+str(float(m))+'\n')
+        file.close()
 
 
 
-def cqerror(masterdir):
+def cqerror(masterdir,subdirs):
     # Define something that will list directories that are not hidden
     def listdirNH(path):
         return glob.glob(os.path.join(path, '*'))
@@ -1200,7 +1193,9 @@ def cqerror(masterdir):
         return array[idx]
 
     # Begin finding errors for each set of data
-    for whichset in ['Aug1Data/'+masterdir,'Aug2Data/'+masterdir,'JulyData/'+masterdir]:
+
+    for set in subdirs:
+        whichset = set + masterdir
         # Load in the data and simulations time vectors
         tvector = np.loadtxt(whichset+'Simulations/SimTime.txt').view(float)
         chi = np.loadtxt(whichset+'chi.txt').view(float)
