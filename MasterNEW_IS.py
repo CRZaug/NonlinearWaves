@@ -42,6 +42,37 @@ def createstruct(refdir,masterdir, subdirs):
                 print("Folder already exits!")
 
 
+def choosesims(SIMULATIONS):
+    y_NLS = SIMULATIONS[0]
+    y_dNLS = SIMULATIONS[1]
+    y_Dysthe = SIMULATIONS[2]
+    y_vDysthe = SIMULATIONS[3]
+    y_dGT = SIMULATIONS[4]
+    y_IS = SIMULATIONS[5]
+
+    # Create an array that says which simulations we should draw from    
+    whichsims = np.array([],dtype = int)
+
+    if y_dGT == 'y':
+        whichsims = np.append(whichsims,0)
+    
+    if y_dNLS =='y':
+        whichsims = np.append(whichsims,1)
+    
+    if y_Dysthe =='y':
+        whichsims = np.append(whichsims,2)
+        
+    if y_IS == 'y':
+        whichsims = np.append(whichsims,3)
+        
+    if y_NLS =='y':
+        whichsims = np.append(whichsims,4)
+
+    if y_vDysthe == 'y':
+        whichsims = np.append(whichsims,5)
+    
+    return whichsims
+
 def readsvals(whichset):
     # This function reads values from the Special Values text file associated with each sim
     with open(whichset+'SpecialVals.txt') as csv_file:
@@ -622,6 +653,8 @@ def dataspecialvals(masterdir, subdirs, showplots='no'):
 
 
 def runsims(SIMULATIONS, masterdir,subdirs, num_o_times, bet, per):
+    # bet is the parameter for the Islas Schober Eqn
+    # per controls the 3/16ths rule
     
     y_NLS = SIMULATIONS[0]
     y_dNLS = SIMULATIONS[1]
@@ -629,8 +662,7 @@ def runsims(SIMULATIONS, masterdir,subdirs, num_o_times, bet, per):
     y_vDysthe = SIMULATIONS[3]
     y_dGT = SIMULATIONS[4]
     y_IS = SIMULATIONS[5]
-    # bet is the parameter for the Islas Schober Eqn
-    # per controls the 3/16ths rule
+
     
     
     # Define master directory
@@ -690,15 +722,15 @@ def runsims(SIMULATIONS, masterdir,subdirs, num_o_times, bet, per):
             
         
 
-
-
-def simspecialvals(masterdir, subdirs):
+def simspecialvals(SIMULATIONS,masterdir, subdirs):
     
     # Define something that will list directories that are not hidden
     def listdirNH(path):
         return glob.glob(os.path.join(path, '*'))
     
-
+    ### STEP 0: Determine what simulations should be dealt with
+    whichsims = choosesims(SIMULATIONS)
+    
     ### STEP 1: Load in simulation data
     
     # Load time values
@@ -709,7 +741,7 @@ def simspecialvals(masterdir, subdirs):
     
         # Choose the name of the file the data will be pulled from
         masterdir1 = whichset+'Simulations/'
-        dir = ['dGT Sim','dNLS Sim', 'Dysthe Sim','IS Sim', 'NLS Sim','vDysthe Sim']
+        dir = np.array(['dGT Sim','dNLS Sim', 'Dysthe Sim','IS Sim', 'NLS Sim','vDysthe Sim'])[whichsims]
         
         NLSd = {} 
         dNLSd = {}
@@ -718,6 +750,8 @@ def simspecialvals(masterdir, subdirs):
         vDysthed = {}
         dGTd = {}
         Dictionaries = [dGTd,dNLSd,Dysthed,ISd, NLSd,vDysthed] # Alphabetized
+        Dictionaries = np.array(Dictionaries)[whichsims]
+        print(dir,len(Dictionaries))
         
         # Read in the intital data
         IC = np.loadtxt(whichset+'NonDim Data/NDgauge2.out').view(complex)
@@ -772,9 +806,9 @@ def simspecialvals(masterdir, subdirs):
         vDystheCQ = {}
         dGTCQ = {}
         
-        CQDict = [dGTCQ, dNLSCQ, DystheCQ, ISCQ, NLSCQ, vDystheCQ]
+        CQDict = np.array([dGTCQ, dNLSCQ, DystheCQ, ISCQ, NLSCQ, vDystheCQ])[whichsims]
         keys = ['P', 'M', 'PM', 'wp', 'sb']
-        dname = ['dGT CQ','dNLS CQ','Dysthe CQ', 'IS CQ','NLS CQ','vDysthe CQ']
+        dname = np.array(['dGT CQ','dNLS CQ','Dysthe CQ', 'IS CQ','NLS CQ','vDysthe CQ'])[whichsims]
         
         cid = 0
         for dict in Dictionaries:
@@ -894,11 +928,15 @@ def simspecialvals(masterdir, subdirs):
         
 
 
-def redim(masterdir,subdirs):
+def redim(SIMULATIONS,masterdir,subdirs):
     
     # Define something that will list directories that are not hidden
     def listdirNH(path):
         return glob.glob(os.path.join(path, '*'))
+    
+    
+     ### STEP 0: Determine what simulations should be dealt with
+    whichsims = choosesims(SIMULATIONS)
     
     ### STEP 1: READ IN THE EXPERIMENTAL DATA FILES
     
@@ -932,7 +970,7 @@ def redim(masterdir,subdirs):
         
         ### STEP 2: READ IN THE SIMULATION DATA
         dir = whichset+'Simulations/Conserved Quantities'
-        key2 = ['dGT CQ','dNLS CQ', 'Dysthe CQ', 'IS CQ', 'NLS CQ', 'vDysthe CQ']
+        key2 = np.array(['dGT CQ','dNLS CQ', 'Dysthe CQ', 'IS CQ', 'NLS CQ', 'vDysthe CQ'])[whichsims]
         dk = 0
         for subdir in key2:
             files = listdirNH(dir+'/'+subdir)
@@ -1015,18 +1053,22 @@ def redim(masterdir,subdirs):
         
         ### STEP 4: PLOT THE RESULTS
         
+        print(key2)
+        
         # Initialize for plotting
         plotter1 = [dim_M,dim_P,dim_PM,dim_wp]
-        key2[:0] = [key1]
+        #key2[:0] = [key1]
+        key2 = np.append(key1,key2)
         titles1 = ['CQ M', 'CQ P', r'$\omega_m$', r'$\omega_p$']
         titles2 = np.loadtxt(os.getcwd()+'/'+whichset+'sidebandnums.txt').view(float)
         y1 = ['M (m'+r'$^2$'+')','P (m'+r'$^2$'+'/s)',r'$\omega_m$'+' (mHz)',r'$\omega_p$'+' (mHz)']
         #y2 = [r'$|a_{-3}|$'+' (m)',r'$|a_{-2}|$'+' (m)',r'$|a_{-1}|$'+' (m)',r'$|a_0|$'+' (m)',r'$|a_1|$'+' (m)',r'$|a_2|$'+' (m)',r'$|a_3|$'+' (m)']
         # https://matplotlib.org/devdocs/gallery/lines_bars_and_markers/linestyles.html
         disp = [0, (0, (1, 1)), (0, (5, 1)), (0, (3, 1, 1, 1, 1, 1)), (0, ()), (0, (3, 1, 1, 1)),(0, (1,5))]
-        colors = ['k','#BF8EDE','#EfA0A0','#84E3BE','#EFD7B0','#443E9D','#D65050']
-        sizes = [13,1.5,1.5,1.5,1.5,1.5,1.5]
+        colors = np.array(['k','#BF8EDE','#EfA0A0','#84E3BE','#EFD7B0','#443E9D','#D65050'])[np.append(0,whichsims+1)]
+        sizes = np.array([13,1.5,1.5,1.5,1.5,1.5,1.5])[np.append(0,whichsims+1)]
         
+        input(key2)
         # Begin plotting
         fig1, ax1 = plt.subplots(4,1,sharex=True,figsize = (11,6.5))
         fig1.suptitle('Quantities of Interest',fontsize=16)
@@ -1100,12 +1142,18 @@ def redim(masterdir,subdirs):
                 np.savetxt(whichset+'Simulations/Dimensional Results/'+str(ky)[:-3]+' dimCQ/'+val[-1]+'.txt',np.transpose(dim_sb[ky]).view(float))
 
 
-def sberror(masterdir,subdirs):
+def sberror(SIMULATIONS,masterdir,subdirs):
+    
+    #Determine what simulations should be dealt with
+    whichsims = choosesims(SIMULATIONS)
+
+    
     # Define something that will list directories that are not hidden
     def listdirNH(path):
         return glob.glob(os.path.join(path, '*'))
     
     # Since our simtime and actual time vectors don't exactly match, we will use this to find the closest values.
+    ######## STILL NEED TO STOP PENALIZING THE FUNCTION IF THE SIDEBAND DROPS TO 0??!!
     def find_nearest(array, value):
         array = np.asarray(array)
         idx = (np.abs(array - value)).argmin()
@@ -1124,10 +1172,10 @@ def sberror(masterdir,subdirs):
         
         # Choose the name of the file the data will be pulled from
         masterdir1 = whichset+'Simulations/Dimensional Results/'
-        dir = ['dGT dimCQ/', 'dNLS dimCQ/', 'Dysthe dimCQ/','IS dimCQ/', 'NLS dimCQ/','vDysthe dimCQ/']
+        dir = np.array(['dGT dimCQ/', 'dNLS dimCQ/', 'Dysthe dimCQ/','IS dimCQ/', 'NLS dimCQ/','vDysthe dimCQ/'])[whichsims]
         
         # Set up some values for file writing
-        titles = ['dGT', 'dNLS', 'Dysthe', 'IS', 'NLS', 'vDysthe']
+        titles = np.array(['dGT', 'dNLS', 'Dysthe', 'IS', 'NLS', 'vDysthe'])[whichsims]
         errorvect = np.array([])
         
         # Open a file to write the error in
@@ -1182,11 +1230,16 @@ def sberror(masterdir,subdirs):
 
 
 
-def cqerror(masterdir,subdirs):
+def cqerror(SIMULATIONS,masterdir,subdirs):
+    
+    #Determine what simulations should be dealt with
+    whichsims = choosesims(SIMULATIONS)
+    
     # Define something that will list directories that are not hidden
     def listdirNH(path):
         return glob.glob(os.path.join(path, '*'))
-    # Since our simtime and actual time vectors don't exactly match, we will use this to find the closest values.
+    
+    # Since our simtime and actual time vectors don't exactly match, we will use this to find the closest values
     def find_nearest(array, value):
         array = np.asarray(array)
         idx = (np.abs(array - value)).argmin()
@@ -1220,10 +1273,10 @@ def cqerror(masterdir,subdirs):
  
             # Choose the name of the file the data will be pulled from
             masterdir1 = whichset+'Simulations/Dimensional Results/'
-            dir = ['dGT dimCQ/','dNLS dimCQ/', 'Dysthe dimCQ/','IS dimCQ/', 'NLS dimCQ/','vDysthe dimCQ/']
+            dir = np.array(['dGT dimCQ/','dNLS dimCQ/', 'Dysthe dimCQ/','IS dimCQ/', 'NLS dimCQ/','vDysthe dimCQ/'])[whichsims]
             
             # Set up some values for file writing
-            titles = ['dGT', 'dNLS', 'Dysthe', 'IS','NLS', 'vDysthe']
+            titles = np.array(['dGT', 'dNLS', 'Dysthe', 'IS','NLS', 'vDysthe'])[whichsims]
             errorvect = np.array([])
             
             # Open a file to write the error in

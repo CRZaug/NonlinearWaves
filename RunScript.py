@@ -23,15 +23,15 @@ subdirs = ['Aug2Data/']
 # The simulations to run. Put 'y' if it is to be run:
 SIMULATIONS = ['y', #NLS
                'y', #dNLS
-               'y', #Dysthe
-               'y', #vDysthe
-               'y', #dGT
+               'n', #Dysthe
+               'n', #vDysthe
+               'n', #dGT
                'y', #IS
                     ]
 
 
 # Define the name of the directory
-masterdir = '190709_Test/'
+masterdir = '190710_Test/'
 #masterdir = 'L_'+str(period)+'_New/'
 
 print('-'*20)
@@ -53,16 +53,16 @@ ms.runsims(SIMULATIONS,masterdir,subdirs,100,1,0)
 
 print('Getting simulation special values',flush=True)
 print('. . . ',flush=True)
-ms.simspecialvals(masterdir,subdirs)
+ms.simspecialvals(SIMULATIONS,masterdir,subdirs)
 
 print('Redimensionalizing',flush=True)
 print('. . . ',flush=True)
-ms.redim(masterdir,subdirs)
+ms.redim(SIMULATIONS,masterdir,subdirs)
 
 print('Finding error',flush=True)
 print('. . . ',flush=True)
-ms.sberror(masterdir,subdirs)
-ms.cqerror(masterdir,subdirs)
+ms.sberror(SIMULATIONS,masterdir,subdirs)
+ms.cqerror(SIMULATIONS,masterdir,subdirs)
 
 print('PROCESSING COMPLETE')
 print()
