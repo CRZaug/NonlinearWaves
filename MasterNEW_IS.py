@@ -98,7 +98,7 @@ def processnondim(masterdir, deltaf, L, subdirs, doIplot = 'no',doIplot_chi = 'g
     
     # Define something that will list directories that are not hidden
     def listdirNH(path):
-        return glob.glob(os.path.join(path, '*'))
+        return sorted(glob.glob(os.path.join(path, '*')))
     
     j = 0
     for sd in subdirs:
@@ -106,6 +106,7 @@ def processnondim(masterdir, deltaf, L, subdirs, doIplot = 'no',doIplot_chi = 'g
         whichset = sd+masterdir
 
         files = listdirNH(sd+'Rescaled')
+        
         
         # Initialize some values
         n = 0
@@ -380,11 +381,11 @@ def processnondim(masterdir, deltaf, L, subdirs, doIplot = 'no',doIplot_chi = 'g
 
 
 
-def dataspecialvals(masterdir, subdirs, showplots='no'):
+def dataspecialvals(masterdir, subdirs, showplots='no',plotem = 'no'):
     
     # Define something that will list directories that are not hidden
     def listdirNH(path):
-        return glob.glob(os.path.join(path, '*'))
+        return sorted(glob.glob(os.path.join(path, '*')))
     
     
     ### STEP 1: Read in the xi, B, and chi data
@@ -396,15 +397,13 @@ def dataspecialvals(masterdir, subdirs, showplots='no'):
         
         
         # Choose the name of the file the data will be pulled from
-        dir = whichset+'/NonDim Data'
+        dir = whichset+'NonDim Data'
         dirnames = listdirNH(dir)
         dirlength = len(os.listdir(dir))
-        
         
         tvector = np.loadtxt(whichset+'/chi.txt').view(float) #times
         values = {} # The x and y values at each location
         for name  in dirnames:
-        
             vdatavals = np.loadtxt(name).view(complex)# xi and B
         
             title = name[-10:-4]
@@ -412,7 +411,6 @@ def dataspecialvals(masterdir, subdirs, showplots='no'):
             
             # Save values to dictionaries
             values[title]=np.append([vdatavals[0]],[vdatavals[1]],axis=0) 
-        
         
         
         ### STEP 2: Find the sideband values and the carrier wave location
@@ -517,10 +515,9 @@ def dataspecialvals(masterdir, subdirs, showplots='no'):
             PMvals[j] = np.real(PM)
             wpeak[j] = np.real(carrier)
             sideband7[j]=np.real(sidebands)
-        
             
             j=j+1
-            
+        
         # Get the number on each sidebands for labeling purposes
         svlabp = []
         iop  = 0
@@ -538,8 +535,6 @@ def dataspecialvals(masterdir, subdirs, showplots='no'):
                 
         svlab = np.append(svlabp,np.flip(svlabn,axis=0),axis=0)
         np.savetxt(whichset+'/sidebandnums'+'.txt', svlab.view(int))
-        
-    
             
         ### STEP 4: Save the Data
         
@@ -563,8 +558,7 @@ def dataspecialvals(masterdir, subdirs, showplots='no'):
         
         ### STEP 5: Plot the values at each time chi
         
-        plotem = 1
-        if plotem == 1:
+        if plotem == 'go':
         
             # Plotting vectors
             fig1, ax1 = plt.subplots(2,2,figsize = (10,6.5))
@@ -698,26 +692,21 @@ def runsims(SIMULATIONS, masterdir,subdirs, num_o_times, bet, per):
         PARAMS = [whichset,num_o_times,starttime,rk4steps,gridnum]
         
         if y_NLS =='y':
-            print('ran NLS')
             NLS.runNLS(PARAMS,simtimes,u0,expconsts,per)
             
         if y_dNLS =='y':
-            print('ran dNLS')
             dNLS.rundNLS(PARAMS,simtimes,u0,expconsts,Del,per)
             
         if y_Dysthe =='y':
             dy.runDysthe(PARAMS,simtimes,u0,k,expconsts,epsilon,per)
             
         if y_vDysthe == 'y':
-            print('ran vDysthe')
             vdy.runvDysthe(PARAMS,simtimes,u0,k,expconsts,epsilon,Del,per)
         
         if y_dGT == 'y':
-            print('ran dGT')
             dGT.rundGT(PARAMS,simtimes,u0,k,expconsts,epsilon,Del,per)
             
         if y_IS == 'y':
-            print('ran IS')
             IS.runIS(PARAMS,simtimes,u0,k,expconsts,bet,epsilon,Del,per)
             
         
@@ -726,7 +715,7 @@ def simspecialvals(SIMULATIONS,masterdir, subdirs):
     
     # Define something that will list directories that are not hidden
     def listdirNH(path):
-        return glob.glob(os.path.join(path, '*'))
+        return sorted(glob.glob(os.path.join(path, '*')))
     
     ### STEP 0: Determine what simulations should be dealt with
     whichsims = choosesims(SIMULATIONS)
@@ -751,7 +740,6 @@ def simspecialvals(SIMULATIONS,masterdir, subdirs):
         dGTd = {}
         Dictionaries = [dGTd,dNLSd,Dysthed,ISd, NLSd,vDysthed] # Alphabetized
         Dictionaries = np.array(Dictionaries)[whichsims]
-        print(dir,len(Dictionaries))
         
         # Read in the intital data
         IC = np.loadtxt(whichset+'NonDim Data/NDgauge2.out').view(complex)
@@ -866,9 +854,8 @@ def simspecialvals(SIMULATIONS,masterdir, subdirs):
             svlab = np.append(svlabp,np.flip(svlabn,axis=0),axis=0) 
             
         ### STEP 4: Plot the results
-        
-            plotem = 1
-            if plotem == 1:
+            plotem = 'go'
+            if plotem == 'go':
                 tn = dname[cid]
                 
                 # Plotting vectors
@@ -932,7 +919,7 @@ def redim(SIMULATIONS,masterdir,subdirs):
     
     # Define something that will list directories that are not hidden
     def listdirNH(path):
-        return glob.glob(os.path.join(path, '*'))
+        return sorted(glob.glob(os.path.join(path, '*')))
     
     
      ### STEP 0: Determine what simulations should be dealt with
@@ -1053,8 +1040,6 @@ def redim(SIMULATIONS,masterdir,subdirs):
         
         ### STEP 4: PLOT THE RESULTS
         
-        print(key2)
-        
         # Initialize for plotting
         plotter1 = [dim_M,dim_P,dim_PM,dim_wp]
         #key2[:0] = [key1]
@@ -1068,7 +1053,6 @@ def redim(SIMULATIONS,masterdir,subdirs):
         colors = np.array(['k','#BF8EDE','#EfA0A0','#84E3BE','#EFD7B0','#443E9D','#D65050'])[np.append(0,whichsims+1)]
         sizes = np.array([13,1.5,1.5,1.5,1.5,1.5,1.5])[np.append(0,whichsims+1)]
         
-        input(key2)
         # Begin plotting
         fig1, ax1 = plt.subplots(4,1,sharex=True,figsize = (11,6.5))
         fig1.suptitle('Quantities of Interest',fontsize=16)
@@ -1104,6 +1088,10 @@ def redim(SIMULATIONS,masterdir,subdirs):
             sideband7=np.delete(sbvals, 0, 0)
             for po in range(len(titles2)):
                 if dispind ==0:
+                    # print(sideband7)
+                    # print(colors[dispind])
+                    # print(sizes[dispind])
+                    # print()
                     ax2[po].plot(x, sideband7[po], '.', color = colors[dispind], markersize = sizes[dispind])
                 else:
                     ax2[po].plot(x,sideband7[po],linestyle = disp[dispind],color = colors[dispind],linewidth = sizes[dispind])
@@ -1148,9 +1136,6 @@ def sberror(SIMULATIONS,masterdir,subdirs):
     whichsims = choosesims(SIMULATIONS)
 
     
-    # Define something that will list directories that are not hidden
-    def listdirNH(path):
-        return glob.glob(os.path.join(path, '*'))
     
     # Since our simtime and actual time vectors don't exactly match, we will use this to find the closest values.
     ######## STILL NEED TO STOP PENALIZING THE FUNCTION IF THE SIDEBAND DROPS TO 0??!!
@@ -1229,15 +1214,10 @@ def sberror(SIMULATIONS,masterdir,subdirs):
         file.close()
 
 
-
 def cqerror(SIMULATIONS,masterdir,subdirs):
     
     #Determine what simulations should be dealt with
     whichsims = choosesims(SIMULATIONS)
-    
-    # Define something that will list directories that are not hidden
-    def listdirNH(path):
-        return glob.glob(os.path.join(path, '*'))
     
     # Since our simtime and actual time vectors don't exactly match, we will use this to find the closest values
     def find_nearest(array, value):
