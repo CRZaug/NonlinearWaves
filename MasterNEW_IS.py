@@ -15,14 +15,14 @@ import csv
 from sys import exit
 
 
-def createstruct(refdir,masterdir, subdirs):
+def createstruct(refdir, masterdir, subdirs):
+    # This code looks at a sample directory and recreates that structure to store
+    # the results of each new run. The code assumes this structure in order to work!
     # Refdir is the reference directory structure, stored on my computer for EACH data set
     # Masterdir is the directory under which all the other work will be stored.
     # Data_sets currently include Aug1Data, Aug2Data, and JulyData. Will be
     # given by a list of indices (I think)
     
-    
-    ### Creates the system of directories necessary for the code to work and store the results
     
     
     for sd in subdirs:
@@ -42,7 +42,15 @@ def createstruct(refdir,masterdir, subdirs):
                 print("Folder already exits!")
 
 
+
 def choosesims(SIMULATIONS):
+    # Given a vector of "y" and "n" values (Ex: ['y','n','n','n','n','n'], this function creates a
+    # vector representing an index that pulls the correct simulations in other parts of the script
+    # SIMULATIONS controls which simulations to be considered. ORDER MATTERS.
+        # Order: NLS, dNLS, Dysthe, vDysthe, dGT, IS (Just the order in which I implemented the models)
+    
+    
+    # Translate the vector into values corresponding to each simulation. ORDER MATTERS
     y_NLS = SIMULATIONS[0]
     y_dNLS = SIMULATIONS[1]
     y_Dysthe = SIMULATIONS[2]
@@ -73,8 +81,16 @@ def choosesims(SIMULATIONS):
     
     return whichsims
 
+
+
 def readsvals(whichset):
-    # This function reads values from the Special Values text file associated with each sim
+    # This function reads and returns values (as a tuple) from the Special Values text file associated with each sim
+    # Specifically, it returns w_0, epsilon, and delta
+    # whichset is the directory to pull from
+    
+    
+    
+    # Open the text file that contains the desired information and read it
     with open(whichset+'SpecialVals.txt') as csv_file:
         csv_reader = csv.reader(csv_file, delimiter=',')
     
@@ -85,16 +101,26 @@ def readsvals(whichset):
         epsilon = vals[1][1]
         Del = vals[2][1]
     
-        # Convert the results to floats so that they are actually intrepreted as numbers
+    # Convert the results to floats so that they are actually intrepreted as numbers
     return (float(w0),float(epsilon),float(Del))
 
 
 
 def processnondim(masterdir, deltaf, L, subdirs, doIplot = 'no',doIplot_chi = 'go'):
+    # This procecess the data, finds special values, and returns nondimensionalized versions of it
+    # Masterdir is the place all of the new information will be sent to
+    # Deltaf is the width of the discretized spectrum, should be 1
+    # L is the period, should be three hours
+    # Subdirs is a vector of the correct subdirectors (out of Aug1, Aug2, July) to pull from
+        # Should be of the form subdirs = ['Aug1Data/']
+    # doIplot shows the data processing process, such as generating the real surface of the wave
+    # doIplot_chi plots all the dimensionless surfaces together
+    
+    
     
     ### STEP 1: Get distance information
-    distv = np.array([0.0,2400000.0,4200000.0,8700000.0]) # Distances between gauges in METERS
-
+    distv = np.array([0.0,2400000.0,4200000.0,8700000.0]) # Distances from gauge 1 to gauge n in METERS
+    #distv = np.array([0.0,3300000.0, 5700000.0, 7500000.0]) #USE ONLY FOR AUG4
     
     # Define something that will list directories that are not hidden
     def listdirNH(path):
@@ -103,8 +129,8 @@ def processnondim(masterdir, deltaf, L, subdirs, doIplot = 'no',doIplot_chi = 'g
     j = 0
     for sd in subdirs:
         
+        # Find the files to study
         whichset = sd+masterdir
-
         files = listdirNH(sd+'Rescaled')
         
         
@@ -120,9 +146,8 @@ def processnondim(masterdir, deltaf, L, subdirs, doIplot = 'no',doIplot_chi = 'g
         for f in files:
             datavals = np.transpose(np.loadtxt(f).view(float))
             N = len(datavals[1])
-            x = datavals[0] # Frequencies
-            sly = datavals[1] # Magnitudes
-            
+            x = datavals[0] # Frequencies in mHz
+            sly = datavals[1] # Magnitudes in cm^2/mHz
             
             
     ### STEP 3: Interpolate the data and get new y values
@@ -134,6 +159,7 @@ def processnondim(masterdir, deltaf, L, subdirs, doIplot = 'no',doIplot_chi = 'g
             
             xmaxloc = np.where(slymax==sly2)[0][0]
         
+            # The first and last values of the Snodgrass data
             aa = x[0]
             bb = x[-1]
         
@@ -156,17 +182,18 @@ def processnondim(masterdir, deltaf, L, subdirs, doIplot = 'no',doIplot_chi = 'g
                 if np.logical_and(bb>ixn,aa<ixn):
                     xfinal=np.append(xfinal,ixn)
             
-            
             # Get the new values
             ly = fnc(xfinal)*deltaf
             
-            # Find the significant wave height
+            # Get rid of potential negative values
+            negind = np.where(ly<0)
+            ly[negind]=0
             
+            # Find the significant wave height, if desired
             #wvht = 4*np.sqrt(sum(ly))
            
-            
-            # Adjust the units on the x axis to get to mHz
-            xfinal = xfinal*0.001
+            # Adjust the units on the x axis to get to get from mHz = 0.001Hz to Hz
+            xfinal = xfinal*0.001 # now in Hz
             
             gaugenumber +=1      
             
@@ -174,7 +201,7 @@ def processnondim(masterdir, deltaf, L, subdirs, doIplot = 'no',doIplot_chi = 'g
             
     ### STEP 4: Get the k vector using integer division and clean up
             lenly = len(ly)
-            k = np.round((xfinal)/(2*np.pi/L),0)  # Then divide by 2pi/L (rounding to integers) to get the k vector
+            k = np.round((xfinal)/(2*np.pi/L),0)  # Divide by 2pi/L (rounding to integers) to get the k vector
             
             if doIplot == 'go':
                 plt.title('Comparing the values when forced into kvector slots')
@@ -185,11 +212,11 @@ def processnondim(masterdir, deltaf, L, subdirs, doIplot = 'no',doIplot_chi = 'g
             
     ### STEP 5: Generate random phase and real and imaginary parts
             randvals = np.random.rand(lenly)*2*np.pi
-            ascale = np.cos(randvals)*np.sqrt(ly)*0.01 # Rescale y axis
-            bscale = np.sin(randvals)*np.sqrt(ly)*0.01 # Rescale y axix
+            ascale = np.cos(randvals)*np.sqrt(ly)*0.01 # Rescale y axis to m
+            bscale = np.sin(randvals)*np.sqrt(ly)*0.01 # Rescale y axix to m
             
             # Add the real and imaginary parts together
-            fakevals = (ascale+1j*bscale)
+            fakevals = (ascale+1j*bscale) # Amplitudes in m
     
     
     
@@ -211,16 +238,14 @@ def processnondim(masterdir, deltaf, L, subdirs, doIplot = 'no',doIplot_chi = 'g
             negativey = np.conj(np.append(np.flip(ndy[:-1],axis=0),extrazeros[1:]))
             
             # New y values
-        
             ynew2=np.append(positivey,negativey)
-            ynew2 = ynew2*len(ynew2) # Needd this to satisfy Parseval's thm
+            ynew2 = ynew2*len(ynew2) # Need to multiply by len(ynew2) to satisfy Parseval's thm
             extrak = np.arange(0,ndk[0])
             
             # New x axis values
             k1 = np.append(np.append(np.append(extrak,ndk),-np.flip(ndk[:-1],axis=0)),-np.flip(extrak,axis=0))[:-1]
             
             # Check Parseval's thm, if desired
-            
             # dft = 1/len(ynew2)*sum(np.abs(fft(ynew2))**2)
             # reg = sum(np.abs(ynew2)**2)
             #print(dft,reg)
@@ -256,6 +281,7 @@ def processnondim(masterdir, deltaf, L, subdirs, doIplot = 'no',doIplot_chi = 'g
                 g.suptitle(f)
                 g.subplots_adjust(top=0.88) 
             plt.show()
+            
             
             
     ### STEP 7: Locate the carrier wave
@@ -382,6 +408,13 @@ def processnondim(masterdir, deltaf, L, subdirs, doIplot = 'no',doIplot_chi = 'g
 
 
 def dataspecialvals(masterdir, subdirs, showplots='no',plotem = 'no'):
+    # This script takes in the processed data and gets out the conserved quantities
+    # Masterdir is the place all of the new information will be sent to
+    # Subdirs is a vector of the correct subdirectors (out of Aug1, Aug2, July) to pull from
+        # Should be of the form subdirs = ['Aug1Data/']
+    # showplots shows which sidebands are getting counted, shows the CQs, and shows the fit of m
+    # plotem controls whether the CQs even get plotted at all 
+    
     
     # Define something that will list directories that are not hidden
     def listdirNH(path):
@@ -613,8 +646,6 @@ def dataspecialvals(masterdir, subdirs, showplots='no',plotem = 'no'):
             file.close()
             file = open(whichset+'SpecialVals.txt','a')
             file.write('delta, '+str(float(m))+'\n')
-            
-        
         file.close() 
         
         
@@ -647,8 +678,12 @@ def dataspecialvals(masterdir, subdirs, showplots='no',plotem = 'no'):
 
 
 def runsims(SIMULATIONS, masterdir,subdirs, num_o_times, bet, per):
+    # SIMULATIONS is the vector of simulations to run
+    # Masterdir is the directory everything will be placed into
+    # Subdirs control what set of data (Aug1, Aug2, July) are simulated
+    # num_o_times gives the number of points between the first and last gauge to output
     # bet is the parameter for the Islas Schober Eqn
-    # per controls the 3/16ths rule
+    # per controls the 3/16ths rule; ususally set to 0
     
     y_NLS = SIMULATIONS[0]
     y_dNLS = SIMULATIONS[1]
@@ -676,8 +711,11 @@ def runsims(SIMULATIONS, masterdir,subdirs, num_o_times, bet, per):
         times = np.loadtxt(whichset+'chi.txt').view(float)
         starttime = times[0]
         stoptime = times[-1]
-        #num_o_times = 300
         simtimes = np.linspace(starttime,stoptime,num_o_times)
+        
+        simtimes = np.sort(np.append(simtimes[1:-1],times)) # Include the ACTUAL data positions in the simtimes
+        num_o_times = len(simtimes) # Update num_o_times to reflect the new addition
+    
         
         # Save time data
         np.savetxt(whichset+'/Simulations/SimTime.txt',simtimes.view(float))
@@ -712,6 +750,10 @@ def runsims(SIMULATIONS, masterdir,subdirs, num_o_times, bet, per):
         
 
 def simspecialvals(SIMULATIONS,masterdir, subdirs):
+    # SIMULATIONS are the simulations to be considered
+    # Masterdir is the directory all new results will be put in
+    # Subdirs controls which set(s) of data will be considered (Aug1, Aug2, July)
+    
     
     # Define something that will list directories that are not hidden
     def listdirNH(path):
@@ -916,6 +958,9 @@ def simspecialvals(SIMULATIONS,masterdir, subdirs):
 
 
 def redim(SIMULATIONS,masterdir,subdirs):
+    # SIMULATIONS are the simulations to be considered
+    # Masterdir is the directory all new results will be put in
+    # Subdirs controls which set(s) of data will be considered (Aug1, Aug2, July)
     
     # Define something that will list directories that are not hidden
     def listdirNH(path):
@@ -1131,6 +1176,11 @@ def redim(SIMULATIONS,masterdir,subdirs):
 
 
 def sberror(SIMULATIONS,masterdir,subdirs):
+    # This code computes the errors for the sidebands, comparing simulations to data
+    # Note: It does not count error for when there is no sideband information at a certain gauge
+    # SIMULATIONS are the simulations to be considered
+    # Masterdir is the directory all new results will be put in
+    # Subdirs controls which set(s) of data will be considered (Aug1, Aug2, July)
     
     #Determine what simulations should be dealt with
     whichsims = choosesims(SIMULATIONS)
@@ -1188,6 +1238,13 @@ def sberror(SIMULATIONS,masterdir,subdirs):
             for t in usable_times:
                 sim_val = sb[t][1:] # First entry is the distance in the ocean; don't want it
                 data_val = datacqvalues[j][1:] # First entry is the distance in the ocean; don't want it
+                
+                # Get rid of zero values
+                zeroindex = np.where(data_val<10**-15)[0] # Where values less than 10^-10 are located; these are effectively 0
+                
+                data_val = np.delete(data_val, zeroindex)
+                sim_val = np.delete(sim_val, zeroindex)
+                
                 error = 1/(len(data_val)-1)*np.sum(np.abs(sim_val-data_val)**2) # Error at each gauge
                 simulationtotalerror += error
                 j=j+1
@@ -1215,6 +1272,16 @@ def sberror(SIMULATIONS,masterdir,subdirs):
 
 
 def cqerror(SIMULATIONS,masterdir,subdirs):
+    # This code computes the errors for conserved quantities
+        # M
+        # P
+        # w_m
+        # w_p
+    # Using the standard error norm. It compares data to simulations
+    # SIMULATIONS are the simulations to be considered
+    # Masterdir is the directory all new results will be put in
+    # Subdirs controls which set(s) of data will be considered (Aug1, Aug2, July)
+    
     
     #Determine what simulations should be dealt with
     whichsims = choosesims(SIMULATIONS)
@@ -1236,19 +1303,21 @@ def cqerror(SIMULATIONS,masterdir,subdirs):
         dif1 = chi[1]
         dif2 = chi[2]
         
+        print(dif1,dif2)
         # Find next closest time values
         v1 = find_nearest(tvector,dif1)
         i1 = np.where(tvector==v1)[0][0]
         v2 = find_nearest(tvector,dif2)
         i2 = np.where(tvector==v2)[0][0]
 
+        print(v1,v2)
+        
         usable_times = [0,i1,i2,-1]
 
             
         cqnamevector = ['M','P','PM','wp']
         g=0
         for type in ['dimM.txt','dimP.txt','dimPM.txt','dimwp.txt']:
-
             datacqvalues = np.loadtxt(whichset+'Data CQs/Dim CQ Values/'+type).view(float)[:,1]
  
             # Choose the name of the file the data will be pulled from
@@ -1263,12 +1332,10 @@ def cqerror(SIMULATIONS,masterdir,subdirs):
             file = open(whichset+'Simulations/Errors/'+cqnamevector[g]+' Error.txt','w+') 
             k = 0
             for d in dir:
-           
                 # Read in the intital data
                 sim_val = np.loadtxt(masterdir1+d+type).view(float)[:,1]
 
                 simulationtotalerror = 1/(len(usable_times)-1)*np.abs(np.sum(sim_val[usable_times]-datacqvalues))
-                
                 # Add this value to a vector of all the errors
                 errorvect=np.append(errorvect,simulationtotalerror)
                 
