@@ -119,7 +119,8 @@ def processnondim(masterdir, deltaf, L, subdirs, doIplot = 'no',doIplot_chi = 'g
     
     
     ### STEP 1: Get distance information
-    distv = np.array([0.0,2400000.0,4200000.0,8700000.0]) # Distances from gauge 1 to gauge n in METERS
+    #distv = np.array([0.0,2400000.0,4200000.0,8700000.0]) # Distances from gauge 1 to gauge n in METERS
+    distv = np.array([0.0,2400000.0,4200000.0,8700000.0])
     #distv = np.array([0.0,3300000.0, 5700000.0, 7500000.0]) #USE ONLY FOR AUG4
     
     # Define something that will list directories that are not hidden
@@ -157,6 +158,7 @@ def processnondim(masterdir, deltaf, L, subdirs, doIplot = 'no',doIplot_chi = 'g
             sly2 = fnc(x)
             slymax = max(sly2)
             
+            
             xmaxloc = np.where(slymax==sly2)[0][0]
         
             # The first and last values of the Snodgrass data
@@ -182,12 +184,15 @@ def processnondim(masterdir, deltaf, L, subdirs, doIplot = 'no',doIplot_chi = 'g
                 if np.logical_and(bb>ixn,aa<ixn):
                     xfinal=np.append(xfinal,ixn)
             
+            
+        
             # Get the new values
             ly = fnc(xfinal)*deltaf
-            
+
             # Get rid of potential negative values
             negind = np.where(ly<0)
             ly[negind]=0
+            
             
             # Find the significant wave height, if desired
             #wvht = 4*np.sqrt(sum(ly))
@@ -195,31 +200,41 @@ def processnondim(masterdir, deltaf, L, subdirs, doIplot = 'no',doIplot_chi = 'g
             # Adjust the units on the x axis to get to get from mHz = 0.001Hz to Hz
             xfinal = xfinal*0.001 # now in Hz
             
+            mmx = 1/xfinal
+            
+            #print(mmx[0],mmx[-1])
+            #print(mmx[0]/mmx[-1])
+            #print()
+            
             gaugenumber +=1      
             
             
             
     ### STEP 4: Get the k vector using integer division and clean up
             lenly = len(ly)
-            k = np.round((xfinal)/(2*np.pi/L),0)  # Divide by 2pi/L (rounding to integers) to get the k vector
-            
+            #k = np.round((xfinal)/(2*np.pi/L),0)  # Divide by 2pi/L (rounding to integers) to get the k vector
+            k =np.round(xfinal*L,0)
+            print(k)
             if doIplot == 'go':
-                plt.title('Comparing the values when forced into kvector slots')
-                plt.plot((xfinal)/(2*np.pi/L),ly,'.')
-                plt.plot(k,ly,'.')
-                plt.show()
+                nfig,nax = plt.subplots(1)
+                nax.set_title('Comparing the values when forced into kvector slots')
+                #nax.plot((xfinal)/(2*np.pi/L),ly,'.')
+                nax.plot((xfinal)*L,ly,'.')
+                nax.set_ylabel('Snodgrass amplitude, cm^2')
+                nax.plot(k,ly,'.')
+                plt.show() #########################
+
             
             
     ### STEP 5: Generate random phase and real and imaginary parts
+            np.random.seed(1) # This ensures that the random phase will be the same 2 runs in a row
             randvals = np.random.rand(lenly)*2*np.pi
             ascale = np.cos(randvals)*np.sqrt(ly)*0.01 # Rescale y axis to m
             bscale = np.sin(randvals)*np.sqrt(ly)*0.01 # Rescale y axix to m
             
             # Add the real and imaginary parts together
             fakevals = (ascale+1j*bscale) # Amplitudes in m
-    
-    
-    
+            
     ### STEP 6: Remove duplicate values and generate a 2-sided Hermitian spectrum for testing
             ndk = np.arange(k[0],k[-1]+1)
             ndy = np.zeros(len(ndk),dtype=complex)
@@ -239,48 +254,51 @@ def processnondim(masterdir, deltaf, L, subdirs, doIplot = 'no',doIplot_chi = 'g
             
             # New y values
             ynew2=np.append(positivey,negativey)
-            ynew2 = ynew2*len(ynew2) # Need to multiply by len(ynew2) to satisfy Parseval's thm
+
+            #ynew2 = ynew2*len(ynew2) # Need to multiply by len(ynew2) to satisfy Parseval's -- thm NOT TRUE
             extrak = np.arange(0,ndk[0])
             
             # New x axis values
             k1 = np.append(np.append(np.append(extrak,ndk),-np.flip(ndk[:-1],axis=0)),-np.flip(extrak,axis=0))[:-1]
             
-            # Check Parseval's thm, if desired
-            # dft = 1/len(ynew2)*sum(np.abs(fft(ynew2))**2)
-            # reg = sum(np.abs(ynew2)**2)
+            ## Check Parseval's thm, if desired
+            #dft = 1/len(ynew2)*sum(np.abs(fft(ynew2))**2)
+            #reg = sum(np.abs(ynew2)**2)
             #print(dft,reg)
         
             # Optional plotting
  
             if doIplot=='go':
                 
-                bbb = np.real(ifft(ynew2))
+                bbb = np.real(ifft(ynew2*len(ynew2))) #because of python normalization
                 timex = np.linspace(0,L,len(bbb))
                 
                 f1,a=plt.subplots(3)
-                
+                a[0].set_title('Check random phase of Hermitian spectrum')
                 a[0].plot(k1,np.real(ynew2),'.')
                 a[1].plot(k1,np.imag(ynew2),'.')
-                a[2].plot(k1,ynew2*np.conj(ynew2),'.',markersize=5)
-                a[2].plot(k,ly*len(ynew2)/2*0.01**2*len(ynew2)/2,'.')
+                a[2].plot(k1,np.abs(ynew2),'.',markersize=5)
+                
+                a[0].set_ylabel('Real part, m')
+                a[1].set_ylabel('Imaginary part, m')
+                a[2].set_ylabel('Amplitude, m')
                 
                 f1.suptitle('Period: '+ str(L) + ' s')
                 f1.subplots_adjust(top=0.88)
                 
                 
                 g,b=plt.subplots(3)
+                b[0].set_title('Wave profile before factorization')
                 b[0].plot(timex,np.real(bbb))
                 b[1].plot(timex,np.imag(bbb))
                 b[2].plot(timex,np.abs(bbb))
-                b[2].set_ylabel('Wave Height (m)')
-                b[1].set_ylabel('Wave Height (m)')
-                b[0].set_ylabel('Wave Height (m)')
+                b[0].set_ylabel('Real Wave Height (m)')
+                b[1].set_ylabel('Imag Wave Height (m)')
+                b[2].set_ylabel('Amplitude Wave Height (m)')
                 b[2].set_xlabel('Time (s)')
-                b[1].set_xlabel('Time (s)')
-                b[0].set_xlabel('Time (s)')
                 g.suptitle(f)
                 g.subplots_adjust(top=0.88) 
-            plt.show()
+            
             
             
             
@@ -299,10 +317,12 @@ def processnondim(masterdir, deltaf, L, subdirs, doIplot = 'no',doIplot_chi = 'g
     ### STEP 8: Get nondimensionalization constants    
             g = 9.81 #(m/s^2)
             if n==0:
-                w0 = carrierfreqs[loc] # Get the value from the integer
+                w0 = carrierfreqs[loc]*2*np.pi # Get the value from the integer (angular frequency)
                 k0 = w0**2/g # The carrier wavenumber
-                m = max(np.abs(ynew2)/len(ynew2)) # a0 in the original FD paper
+                #m = max(np.abs(ynew2)/len(ynew2)) # a0 in the original FD paper
+                m = max(np.abs(ynew2)) # a0 in the original FD paper
                 epsilon = 2*m*k0 # The nondimensionalization constant epsilon
+                #epsilon = 0.0022
             
                 # print(f,'Special Values')
                 # print('delta f', deltaf)
@@ -337,7 +357,6 @@ def processnondim(masterdir, deltaf, L, subdirs, doIplot = 'no',doIplot_chi = 'g
             k_new_2 = k_new_1 - k_new_1[loc]
     
         
-        
     ### STEP 10: Sum to get back to temporal space and save
         
             # Define new t data (and a new number of data points)
@@ -348,27 +367,33 @@ def processnondim(masterdir, deltaf, L, subdirs, doIplot = 'no',doIplot_chi = 'g
             # Find B, the new surface modulating envelope
             B=np.zeros(NNN) 
             for v in range(len(yhat1)):
-                newvalue = yhat1[v]/yN*np.exp(1j*(2*np.pi/L)*k_new_2[v]*tnew) # Sum a new fourier series
+                newvalue = yhat1[v]*np.exp(1j*(2*np.pi/L)*k_new_2[v]*tnew) # Sum a new fourier series
+                #newvalue = yhat1[v]*np.exp(1j*(2*np.pi/L)*k_new_2[v]*tnew) # Sum a new fourier series
                 B = B+newvalue
-            
+                
             # Optional plotting
             if doIplot=='go':
                 bfig,bax = plt.subplots(2)
                 bax[0].plot(tnew,np.real(B))
                 bax[1].plot(tnew,np.imag(B))
+                bax[0].set_title('Real(B), m')
+                bax[1].set_title('Imag(B), m')
                 bfig.suptitle(str(f))
                 bfig.subplots_adjust(top=0.88)
             
             
                 figg,axx = plt.subplots()
-                axx.set_title(f)
+                axx.set_title(f+' checking preservation of norm')
+                axx.set_ylabel('FFT of factored B')
                 axx.plot(NLS.kvec(NNN),1/NNN*np.abs(fft(B)),'.',markersize=10)
-                axx.plot(k_new_2,1/len(yhat1)*np.abs(yhat1),'.',markersize = 5) ###################
-                plt.show()
+                axx.plot(k_new_2,np.abs(yhat1),'*',markersize = 5) ###################
+                
+                
+                #plt.show()
             #plt.close('all')
             
             # Save the x and y values for t and B
-            np.savetxt(whichset + '/Processed/'+f[-10:], np.transpose(np.append(tnew,B,axis=0)).view(float))
+            np.savetxt(whichset + '/Processed/'+f[-10:], np.append([tnew],[B],axis=0).view(float))
       
         
     
@@ -376,9 +401,16 @@ def processnondim(masterdir, deltaf, L, subdirs, doIplot = 'no',doIplot_chi = 'g
             ndB = k0/epsilon*B # new "y"
             xi = w0*epsilon*tnew # new "x"
             
+            
+            
+            # for j in 1/NNN*fft(ndB):
+            #     print(np.abs(j),j)
+            # input()
+            
             # Fix up xi so that it is periodic and has the correct number of points to match B
             xi_L = (xi[-1]-xi[0])+(xi[1]-xi[0])
             xi_new = np.linspace(0,xi_L-xi_L/NNN,NNN,dtype=complex)
+            
             
             chi = epsilon**2*k0*distv # new "t"
         
@@ -399,12 +431,12 @@ def processnondim(masterdir, deltaf, L, subdirs, doIplot = 'no',doIplot_chi = 'g
         # Optional plotting of all the dimensionless surfaces together
         n=0
         if doIplot_chi =='go':
-            fig1.suptitle(sd+', L = '+str(L))
+            fig1.suptitle('Dimensionless '+sd+', L = '+str(L))
             fig1.tight_layout()
             fig1.subplots_adjust(top=0.88)
-            #plt.show()
-            plt.savefig(whichset + '/NonDim Figs/allgauges.png',dpi=500)
-
+            plt.show()
+            #plt.savefig(whichset + '/NonDim Figs/allgauges.png',dpi=500)
+    plt.close('all')
 
 
 def dataspecialvals(masterdir, subdirs, showplots='no',plotem = 'no'):
@@ -453,9 +485,8 @@ def dataspecialvals(masterdir, subdirs, showplots='no',plotem = 'no'):
         y=values['gauge2'][1]
         
         # Perform an FFT of the y values
-        yhat =fft(y) # Fourier amplitudes
+        yhat =fft(y) # Fourier amplitudes # used to be yhat
         yhat1 = 1/N*np.abs(yhat) # Normalized fourier amplitudes
-        
         
         # Define some constants/constant vectors
         L = (x[-1]-x[0])+(x[1]-x[0]) # The period
@@ -494,7 +525,7 @@ def dataspecialvals(masterdir, subdirs, showplots='no',plotem = 'no'):
             # Check which values are getting counted as sidebands:
             plt.plot(k1,tempyhat,'.')
             plt.plot(k1[sv],tempyhat[sv],'.',markersize=10)
-            if showplots =='yes':
+            if showplots =='go':
                 plt.show()
         
         
@@ -518,7 +549,7 @@ def dataspecialvals(masterdir, subdirs, showplots='no',plotem = 'no'):
             # Define some constants/constant vectors
             L = (x[-1]-x[0])+(x[1]-x[0])
             # Perform an FFT of the y values
-            yhat =fft(y) # Fourier amplitudes
+            yhat =fft(y) # Fourier amplitudes 
             yhat1 = 1/N*np.abs(yhat) # Normalized fourier amplitudes
             
             # Find max Fourier amplitude and location
@@ -532,6 +563,7 @@ def dataspecialvals(masterdir, subdirs, showplots='no',plotem = 'no'):
             
             P = NLS.CQ_P1(y,L,k1) # Find P
             M = NLS.CQ_M(y,L) # Find M
+            #print(max(y*np.conj(y)),L)
             PM = P/M # Find omega_m
             
         
@@ -621,7 +653,7 @@ def dataspecialvals(masterdir, subdirs, showplots='no',plotem = 'no'):
             fig1.subplots_adjust(top=0.88)
             fig2.tight_layout()
             fig2.subplots_adjust(top=0.88)
-            if showplots =='yes':
+            if showplots =='go':
                 plt.show()
             
         
@@ -670,11 +702,11 @@ def dataspecialvals(masterdir, subdirs, showplots='no',plotem = 'no'):
         ax3[0].set_ylabel(r'$\mathcal{M}$')
         ax3[0].legend(loc='upper right')
         fig3.tight_layout()
-        fig3.subplots_adjust(top=0.88)
-        if showplots =='yes':
-            plt.savefig('fitM.png',dpi=500)
-            #plt.show()
-
+        fig3.subplots_adjust(top=0.88)      
+        if showplots =='go':
+            #plt.savefig('fitM.png',dpi=500)
+            plt.show()
+    plt.close('all')
 
 
 def runsims(SIMULATIONS, masterdir,subdirs, num_o_times, bet, per):
@@ -808,8 +840,8 @@ def simspecialvals(SIMULATIONS,masterdir, subdirs):
         ### STEP 2: Find the sideband values and the carrier wave location
         
         # Perform an FFT of the y values
-        yhat =fft(y) # Fourier amplitudes
-        yhat1 = 1/N*np.abs(yhat) # Normalized fourier amplitudes
+        yhat =fft(y) # Fourier amplitudes 
+        yhat1 = 1/N*np.abs(yhat) # Normalized fourier amplitudes 
         
         # Define some constants/constant vectors
         L = x[-1]-x[0]+(x[1]-x[0])
@@ -824,6 +856,7 @@ def simspecialvals(SIMULATIONS,masterdir, subdirs):
         
         # Find max Fourier amplitude and location
         mt = max(yhat1) # The max amplitude (m)
+        
         i = np.where(yhat1 == mt)[0][0] ################################
         carrier = 1/L*k[i]
         
@@ -853,8 +886,9 @@ def simspecialvals(SIMULATIONS,masterdir, subdirs):
                 
                 x=dict[n][0]
                 y=dict[n][1]
+                
                 # Perform an FFT of the y values
-                yhat =fft(y) # Fourier amplitudes
+                yhat =fft(y) # Fourier amplitudes-
                 yhat1 = 1/N*np.abs(yhat) # Normalized fourier amplitudes
                 
                 # Find max Fourier amplitude and location
@@ -1002,10 +1036,10 @@ def redim(SIMULATIONS,masterdir,subdirs):
         
         ### STEP 2: READ IN THE SIMULATION DATA
         dir = whichset+'Simulations/Conserved Quantities'
-        key2 = np.array(['dGT CQ','dNLS CQ', 'Dysthe CQ', 'IS CQ', 'NLS CQ', 'vDysthe CQ'])[whichsims]
+        key2 = np.array(['dGT','dNLS', 'Dysthe', 'IS', 'NLS', 'vDysthe'])[whichsims]
         dk = 0
         for subdir in key2:
-            files = listdirNH(dir+'/'+subdir)
+            files = listdirNH(dir+'/'+subdir+' CQ')
             l = 0
             for k in files:
                 Dict = MasterDict[l]
@@ -1030,8 +1064,8 @@ def redim(SIMULATIONS,masterdir,subdirs):
             ent = P[key]
             xi = ent[0]
             p = ent[1]
-            x = xi/(epsilon**2*k0)
-            dim_p = epsilon**3*w0/k0**2*p
+            x = xi/(epsilon**2*k0) #gives m
+            dim_p = epsilon**3*w0/k0**2*p #gives m^2/s
             dim_P[key] = np.append([x],[dim_p],axis = 0)
             
         # Dim M
@@ -1040,8 +1074,8 @@ def redim(SIMULATIONS,masterdir,subdirs):
             ent = M[key]
             xi = ent[0]
             m = ent[1]
-            x = xi/(epsilon**2*k0)
-            dim_m = (epsilon/k0)**2*m
+            x = xi/(epsilon**2*k0) #gives m
+            dim_m = (epsilon/k0)**2*m #gives m^2
             dim_M[key] = np.append([x],[dim_m],axis = 0)
         
         # Dim PM
@@ -1053,8 +1087,8 @@ def redim(SIMULATIONS,masterdir,subdirs):
             m = Ment[1]
             p = Pent[1]
             xi = ent[0]
-            x = xi/(epsilon**2*k0)
-            dim_pm = (p/m)*1000 # Gives mHz
+            x = xi/(epsilon**2*k0) #gives m
+            dim_pm = (p/m)+w0/(2*np.pi)*1000 # Gives mHz
             dim_PM[key] = np.append([x],[dim_pm],axis = 0)
         
         # Dim sb
@@ -1062,23 +1096,22 @@ def redim(SIMULATIONS,masterdir,subdirs):
         for key in sb:
             ent = sb[key]
             xi = ent[0]
-            x = xi/(epsilon**2*k0)
+            x = xi/(epsilon**2*k0) #gives m
             sbv = np.zeros((len(ent)-1,len(xi)))
             for j in range(1,len(ent)):
                 sideband = ent[j]
-                dim_sideband = (epsilon/k0)*sideband
+                dim_sideband = (epsilon/k0)*sideband #gives m
                 sbv[j-1]=dim_sideband
             dim_sb[key] = np.vstack([x,sbv])
-            
-        
+
         # Dim wp
         dim_wp = {}
         for key in wp:
             ent = wp[key]
             xi = ent[0]
             peak = ent[1]
-            x = xi/(epsilon**2*k0)
-            dim_peak = peak+w0*1000 # Gives mHz
+            x = xi/(epsilon**2*k0) #gives m
+            dim_peak = peak+w0/(2*np.pi)*1000 # Gives mHz
             dim_wp[key] = np.append([x],[dim_peak],axis = 0)
         
         
@@ -1089,9 +1122,9 @@ def redim(SIMULATIONS,masterdir,subdirs):
         plotter1 = [dim_M,dim_P,dim_PM,dim_wp]
         #key2[:0] = [key1]
         key2 = np.append(key1,key2)
-        titles1 = ['CQ M', 'CQ P', r'$\omega_m$', r'$\omega_p$']
+        titles1 = ['Quantity '+r'$\mathcal{M}$', 'Quantity '+r'$\mathcal{P}$', 'Quantity '+r'$\omega_m$', 'Quantity '+r'$\omega_p$']
         titles2 = np.loadtxt(os.getcwd()+'/'+whichset+'sidebandnums.txt').view(float)
-        y1 = ['M (m'+r'$^2$'+')','P (m'+r'$^2$'+'/s)',r'$\omega_m$'+' (mHz)',r'$\omega_p$'+' (mHz)']
+        y1 = [r'$\mathcal{M}$'+' (m'+r'$^2$'+')',r'$\mathcal{P}$'+' (m'+r'$^2$'+'/s)',r'$\omega_m$'+' (mHz)',r'$\omega_p$'+' (mHz)']
         #y2 = [r'$|a_{-3}|$'+' (m)',r'$|a_{-2}|$'+' (m)',r'$|a_{-1}|$'+' (m)',r'$|a_0|$'+' (m)',r'$|a_1|$'+' (m)',r'$|a_2|$'+' (m)',r'$|a_3|$'+' (m)']
         # https://matplotlib.org/devdocs/gallery/lines_bars_and_markers/linestyles.html
         disp = [0, (0, (1, 1)), (0, (5, 1)), (0, (3, 1, 1, 1, 1, 1)), (0, ()), (0, (3, 1, 1, 1)),(0, (1,5))]
@@ -1111,17 +1144,22 @@ def redim(SIMULATIONS,masterdir,subdirs):
                 x = VALUES[0]
                 y = VALUES[1]
                 if dispind ==0:
-                    ax1[i].plot(x,y,'.',color = colors[dispind],markersize = sizes[dispind])
+                    l0=ax1[i].plot(x,y,'.',color = colors[dispind],markersize = sizes[dispind])
                 else:
                     ax1[i].plot(x,y,linestyle = disp[dispind],color = colors[dispind],linewidth = sizes[dispind])
                 ax1[i].set_title(titles1[i])
                 ax1[i].set_ylabel(y1[i])
-                ax1[i].ticklabel_format(style='sci',scilimits=(-1,1),axis='both')
+                #ax1[i].ticklabel_format(style='sci',scilimits=(-1,1),axis='both')
             dispind += 1
-            ax1[0].legend(key2,bbox_to_anchor=(1, 1))
+            fig1.legend([l0],     # The line objects
+            borderaxespad=0.1,    # Small spacing around legend box
+            bbox_to_anchor=(.98,.85),   # Position of legend
+            labels=key2,   # The labels for each line
+            )
             ax1[-1].set_xlabel('Location (m)')
             fig1.tight_layout()
             fig1.subplots_adjust(top=0.88)
+            fig1.subplots_adjust(right=.87)
         plt.savefig(whichset+'Final Figures/CQResultFig.png',dpi=500)
         
         fig2, ax2 = plt.subplots(len(titles2),sharex=True,figsize = (7,1.625*len(titles2)))
@@ -1140,7 +1178,7 @@ def redim(SIMULATIONS,masterdir,subdirs):
                     ax2[po].plot(x, sideband7[po], '.', color = colors[dispind], markersize = sizes[dispind])
                 else:
                     ax2[po].plot(x,sideband7[po],linestyle = disp[dispind],color = colors[dispind],linewidth = sizes[dispind])
-                ax2[po].set_ylabel('a'+ r'$_{'+str(int(titles2[po]))+'}$'+' (m'+r'$^2$)')
+                ax2[po].set_ylabel('a'+ r'$_{'+str(int(titles2[po]))+'}$'+' (m)')
 
             fig2.tight_layout()
             fig2.subplots_adjust(top=0.88)
@@ -1164,7 +1202,7 @@ def redim(SIMULATIONS,masterdir,subdirs):
                 if ky == 'Data':
                     np.savetxt(whichset+'Data CQs/Dim CQ Values/'+val[o]+'.txt',np.transpose(cqval[ky]).view(float))
                 else:
-                    np.savetxt(whichset+'Simulations/Dimensional Results/'+str(ky)[:-3]+' dimCQ/'+val[o]+'.txt',np.transpose(cqval[ky]).view(float))
+                    np.savetxt(whichset+'Simulations/Dimensional Results/'+str(ky)+' dimCQ/'+val[o]+'.txt',np.transpose(cqval[ky]).view(float))
             o=o+1
         
         # Save sidebands
@@ -1172,8 +1210,7 @@ def redim(SIMULATIONS,masterdir,subdirs):
             if ky == 'Data':
                 np.savetxt(whichset+'Data CQs/Dim CQ Values/'+val[-1]+'.txt',np.transpose(dim_sb[ky]).view(float))
             else:
-                np.savetxt(whichset+'Simulations/Dimensional Results/'+str(ky)[:-3]+' dimCQ/'+val[-1]+'.txt',np.transpose(dim_sb[ky]).view(float))
-
+                np.savetxt(whichset+'Simulations/Dimensional Results/'+str(ky)+' dimCQ/'+val[-1]+'.txt',np.transpose(dim_sb[ky]).view(float))
 
 def sberror(SIMULATIONS,masterdir,subdirs):
     # This code computes the errors for the sidebands, comparing simulations to data
@@ -1241,10 +1278,8 @@ def sberror(SIMULATIONS,masterdir,subdirs):
                 
                 # Get rid of zero values
                 zeroindex = np.where(data_val<10**-15)[0] # Where values less than 10^-10 are located; these are effectively 0
-                
                 data_val = np.delete(data_val, zeroindex)
                 sim_val = np.delete(sim_val, zeroindex)
-                
                 error = 1/(len(data_val)-1)*np.sum(np.abs(sim_val-data_val)**2) # Error at each gauge
                 simulationtotalerror += error
                 j=j+1
@@ -1302,16 +1337,13 @@ def cqerror(SIMULATIONS,masterdir,subdirs):
         # Find the time values that won't exactly match
         dif1 = chi[1]
         dif2 = chi[2]
-        
-        print(dif1,dif2)
+    
         # Find next closest time values
         v1 = find_nearest(tvector,dif1)
         i1 = np.where(tvector==v1)[0][0]
         v2 = find_nearest(tvector,dif2)
         i2 = np.where(tvector==v2)[0][0]
 
-        print(v1,v2)
-        
         usable_times = [0,i1,i2,-1]
 
             

@@ -236,14 +236,42 @@ def rundNLS(PARAMS,simtimes,u0,expconsts,Del,per):
     # During iteration, deltat (the size of the step remains the same)
     # The initial profile u0 is always the input
     # The final time to step out increases in each loop, thus the number of steps increases in each iteration
-    for t in range(1,num_o_times):
-        steps = t*1
-        endtime = simtimes[t]
-        deltat = (endtime-starttime)/steps
-        #print(steps, endtime, deltat)
-        
-        sim_dNLS = sixth(u0,deltat,steps,expconsts,Del,per)
-        r_dNLS[t,:]=sim_dNLS
+    
+    
+    # y = np.abs(fft(u0))
+    # N=gridnum
+    # plt.plot(np.linspace(0,gridnum,gridnum),np.append(y[N//2:],y[:N//2]),'.')
+    # plt.show()
+    
+    # Use True to run the nonlinear sim
+    nln = True
+    if nln == True:
+        print('nonlinear')
+        for t in range(1,num_o_times):
+            steps = t*100
+            endtime = simtimes[t]
+            deltat = (endtime-starttime)/steps
+            #print(steps, endtime, deltat,flush=True)
+            
+            sim_dNLS = sixth(u0,deltat,steps,expconsts,Del,per)
+            
+            
+            # y = np.abs(fft(sim_dNLS))
+            # plt.plot(np.linspace(0,gridnum,gridnum),np.append(y[N//2:],y[:N//2]),'.')
+            # plt.show()
+            # 
+            r_dNLS[t,:]=sim_dNLS
+    else:
+        print('linear')
+        #### THIS RUNS THE LINEAR PARTS OF dNLS ONLY
+        uhat0 = fft(u0)    
+        for t in range(1,num_o_times):
+            deltat = simtimes[t]
+            uhatnew = uhat0*np.exp(deltat*(1j*expconsts**2-Del))
+            r_dNLS[t,:]=ifft(uhatnew)
+    
+    
+    
     
     # Save data
     for s in range(num_o_times):

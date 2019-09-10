@@ -611,6 +611,7 @@ def dataspecialvals(masterdir,showplots='no'):
 
 
 def runsims(masterdir,num_o_times, per):
+    # Per controls the 3/16ths rule
     
     # Define master directory
     for whichset in ['Aug1Data/'+masterdir,'Aug2Data/'+masterdir,'JulyData/'+masterdir]:
@@ -665,6 +666,7 @@ def runsims(masterdir,num_o_times, per):
             sim_Dysthe = dy.sixth(u0,deltat,steps,rk4steps,k,expconsts,epsilon,per)
             sim_vDysthe = vdy.sixth(u0,deltat,steps,rk4steps,k,expconsts,epsilon,Del,3/4)
             sim_dGT = dGT.sixth(u0,deltat,steps,rk4steps,k,expconsts,epsilon,Del,per)
+            
             
             if np.isnan(sim_vDysthe[0]):
                 if xyz == 0:

@@ -246,22 +246,52 @@ def runvDysthe(PARAMS,simtimes,u0,k,expconsts,epsilon,Del,per):
     # During iteration, deltat (the size of the step remains the same)
     # The initial profile u0 is always the input
     # The final time to step out increases in each loop, thus the number of steps increases in each iteration
-    for t in range(1,num_o_times):
-        steps = t*1
-        endtime = simtimes[t]
-        deltat = (endtime-starttime)/steps
-        #print(steps, endtime, deltat)
+    
+    
+    
+    
+    
+    # y = np.abs(1/gridnum*fft(u0))
+    # plt.plot(np.linspace(0,1,gridnum),np.append(y[gridnum//2:],y[:gridnum//2]))
+    # plt.show()
+    # 
+    
+    # Use True to run the nonlinear sim
+    nln = True
+    if nln == True:
+        print('nonlinear')
+        for t in range(1,num_o_times):
+            steps = t*10
+            endtime = simtimes[t]
+            deltat = (endtime-starttime)/steps
+            print(steps, endtime, deltat,flush=True)
+    
+            sim_vDysthe = sixth(u0,deltat,steps,rk4steps,k,expconsts,epsilon,Del,3/4)
+            
+            # y = np.abs(1/gridnum*fft(sim_vDysthe))
+            # 
+            # plt.plot(np.linspace(0,1,gridnum),np.append(y[gridnum//2:],y[:gridnum//2]))
+            # plt.show()
+            
+            if np.isnan(sim_vDysthe[0])==True:
+                if xyz == 0:
+                    os.system('say "Simulation Overflow Error"')
+                    xyz=+1
+                    input('Continue? Press enter.')
+            
+            r_vDysthe[t,:]=sim_vDysthe
+    
+    else:
+        print('linear')
+        #### THIS RUNS THE LINEAR PARTS OF VDYSTHE ONLY
+        uhat0 = fft(u0)
+        linexpconsts=1j*expconsts**2-Del+5j*Del*epsilon*expconsts
+        for t in range(1,num_o_times):
+            deltat = simtimes[t]
+            uhatnew = uhat0*np.exp(linexpconsts*deltat)
+            r_vDysthe[t,:]=ifft(uhatnew)
 
-        sim_vDysthe = sixth(u0,deltat,steps,rk4steps,k,expconsts,epsilon,Del,3/4)
-       
-        if np.isnan(sim_vDysthe[0]):
-            if xyz == 0:
-                os.system('say "Simulation Overflow Error"')
-                xyz=+1
-                input('Continue? Press enter.')
-
-        r_vDysthe[t,:]=sim_vDysthe
-
+    
     # Save data
     for s in range(num_o_times):
         if s < 10:

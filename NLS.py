@@ -144,7 +144,8 @@ def cn_id(gridnum,kappa,k0,L):
     initialprofile=k0*kappa/np.sqrt(2.0)*cn
     
     k = kvec(gridnum)
-    expconsts=-1j*(2.0*np.pi/L*k)**2
+    #expconsts=-1j*(2.0*np.pi/L*k)**2
+    expconsts = 2*np.pi*1j*k/L
 
     return (xspace,initialprofile,expconsts)
 
@@ -249,14 +250,40 @@ def runNLS(PARAMS,simtimes,u0,expconsts,per):
     # During iteration, deltat (the size of the step remains the same)
     # The initial profile u0 is always the input
     # The final time to step out increases in each loop, thus the number of steps increases in each iteration
-    for t in range(1,num_o_times):
-        steps = t*1
-        endtime = simtimes[t]
-        deltat = (endtime-starttime)/steps
-        #print(steps, endtime, deltat)
-        
-        sim_NLS = sixth(u0,deltat,steps,expconsts,per)
-        r_NLS[t,:]=sim_NLS
+    
+    # Use True to run the nonlinear sim
+    
+    
+    # y = np.abs(fft(u0))*1/gridnum
+    # N=gridnum
+    # plt.plot(np.linspace(0,gridnum,gridnum),np.append(y[N//2:],y[:N//2]),'.')
+    # plt.show()
+    # 
+    nln = True
+    if nln == True:
+        print('nonlinear')
+        for t in range(1,num_o_times):
+            steps = t*100
+            endtime = simtimes[t]
+            deltat = (endtime-starttime)/steps
+            print(steps, endtime, deltat)
+            
+            sim_NLS = sixth(u0,deltat,steps,expconsts,per)
+            
+            # plt.title(str(endtime))
+            # y = np.abs(fft(sim_NLS))*1/gridnum
+            # plt.plot(np.linspace(0,gridnum,gridnum),np.append(y[N//2:],y[:N//2]),'.')
+            # plt.show()
+            
+            r_NLS[t,:]=sim_NLS
+    else:
+        print('linear')
+        ##### THIS RUNS THE LINEAR PARTS OF NLS ONLY
+        uhat0 = fft(u0)    
+        for t in range(1,num_o_times):
+            deltat = simtimes[t]
+            uhatnew = uhat0*np.exp(1j*expconsts**2*deltat)
+            r_NLS[t,:]=ifft(uhatnew)
       
     # Save data
     for s in range(num_o_times):

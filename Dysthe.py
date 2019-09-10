@@ -244,7 +244,7 @@ def runDysthe(PARAMS,simtimes,u0,k,expconsts,epsilon,per):
     # The initial profile u0 is always the input
     # The final time to step out increases in each loop, thus the number of steps increases in each iteration
     for t in range(1,num_o_times):
-        steps = t*1
+        steps = t*100
         endtime = simtimes[t]
         deltat = (endtime-starttime)/steps
         #print(steps, endtime, deltat)
